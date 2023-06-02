@@ -83,6 +83,7 @@ pub use errors::VerifierError;
 pub fn verify<AIR, HashFn, RandCoin>(
     proof: StarkProof,
     pub_inputs: AIR::PublicInputs,
+    pub_inputs1: AIR::PublicInputs,
 ) -> Result<(), VerifierError> 
 where 
     AIR: Air, 
@@ -94,9 +95,11 @@ where
     // received from the prover
     let mut public_coin_seed = proof.context.to_elements();
     public_coin_seed.append(&mut pub_inputs.to_elements());
+    public_coin_seed.append(&mut pub_inputs1.to_elements());
     
     // create AIR instance for the computation specified in the proof
     let air = AIR::new(proof.get_trace_info(), pub_inputs, proof.options().clone());
+    let air1 = AIR::new(proof.get_trace_info(), pub_inputs1, proof.options().clone());
 
     // figure out which version of the generic proof verification procedure to run. this is a sort
     // of static dispatch for selecting two generic parameter: extension field and hash function.
@@ -131,6 +134,7 @@ where
 /// attests to a correct execution of the computation specified by the provided `air`.
 fn perform_verification<A, E, H, R>(
     air: A,
+    air1: A,
     mut channel: VerifierChannel<E, H>,
     mut public_coin: R,
 ) -> Result<(), VerifierError>
@@ -163,12 +167,23 @@ where
         aux_trace_rand_elements.add_segment_elements(rand_elements);
         public_coin.reseed(*commitment);
     }
+    let mut aux_trace1_rand_elements = AuxTraceRandElements::<E>::new();
+    for (i, commitment) in trace_commitments.iter().skip(1).enumerate() {
+        let rand_elements = air1
+            .get_aux_trace_segment_random_elements(i, &mut public_coin)
+            .map_err(|_| VerifierError::RandomCoinError)?;
+        aux_trace1_rand_elements.add_segment_elements(rand_elements);
+        public_coin.reseed(*commitment);
+    }
 
     // build random coefficients for the composition polynomial
     let constraint_coeffs = air
         .get_constraint_composition_coefficients(&mut public_coin)
         .map_err(|_| VerifierError::RandomCoinError)?;
 
+    let constraint_coeffs1 = air1
+        .get_constraint_composition_coefficients(&mut public_coin)
+        .map_err(|_| VerifierError::RandomCoinError)?;
     // 2 ----- constraint commitment --------------------------------------------------------------
     // read the commitment to evaluations of the constraint composition polynomial over the LDE
     // domain sent by the prover, use it to update the public coin, and draw an out-of-domain point
@@ -177,6 +192,8 @@ where
     // and sends the results back to the verifier.
     let constraint_commitment = channel.read_constraint_commitment();
     public_coin.reseed(constraint_commitment);
+    let constraint_commitment1 = channel.read_constraint_commitment();
+    public_coin.reseed(constraint_commitment1);
     let z = public_coin
         .draw::<E>()
         .map_err(|_| VerifierError::RandomCoinError)?;
@@ -201,6 +218,19 @@ where
     );
     public_coin.reseed(H::hash_elements(ood_trace_frame.values()));
 
+    let ood_trace1_frame = channel.read_ood_trace_frame();
+    let ood_main_trace1_frame = ood_trace1_frame.main_frame();
+    let ood_aux_trace1_frame = ood_trace1_frame.aux_frame();
+    let ood_constraint_evaluation_1_1 = evaluate_constraints(
+        &air1,
+        constraint_coeffs1,
+        &ood_main_trace1_frame,
+        &ood_aux_trace1_frame,
+        aux_trace1_rand_elements,
+        z,
+    );
+    public_coin.reseed(H::hash_elements(ood_trace1_frame.values()));
+
     // read evaluations of composition polynomial columns sent by the prover, and reduce them into
     // a single value by computing \sum_{i=0}^{m-1}(z^(i * l) * value_i), where value_i is the
     // evaluation of the ith column polynomial H_i(X) at z, l is the trace length and m is
@@ -219,7 +249,7 @@ where
     public_coin.reseed(H::hash_elements(&ood_constraint_evaluations));
 
     // finally, make sure the values are the same
-    if ood_constraint_evaluation_1 != ood_constraint_evaluation_2 {
+    if ood_constraint_evaluation_1 + ood_constraint_evaluation_1_1 != ood_constraint_evaluation_2 {
         return Err(VerifierError::InconsistentOodConstraintEvaluations);
     }
 
