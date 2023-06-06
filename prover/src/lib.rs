@@ -193,7 +193,7 @@ pub trait Prover {
     fn generate_proof<E>(
         &self,
         mut trace: Self::Trace,
-      
+    
         mut trace1: Self::Trace,
     ) -> Result<StarkProof, ProverError>
     where
@@ -344,7 +344,8 @@ pub trait Prover {
         let evaluator = ConstraintEvaluator::new(&air, aux_trace_rand_elements, constraint_coeffs);
         let constraint_evaluations = evaluator.evaluate(trace_commitment.trace_table(), &domain);
 
-        let evaluator1 = ConstraintEvaluator::new(&air1, aux_trace1_rand_elements, constraint_coeffs);
+        let constraint_coeffs1 = channel.get_constraint_composition_coeffs();
+        let evaluator1 = ConstraintEvaluator::new(&air1, aux_trace1_rand_elements, constraint_coeffs1);
         let constraint_evaluations1 = evaluator1.evaluate(trace1_commitment.trace_table(), &domain);
 
         #[cfg(feature = "std")]
@@ -424,7 +425,7 @@ pub trait Prover {
         // combine all trace polynomials together and merge them into the DEEP composition
         // polynomial
         deep_composition_poly.add_trace_polys(trace_polys, ood_trace_states);
-        deep_composition_poly1.add_trace_polys(trace1_polys, ood_trace1_states);
+        deep_composition_poly.add_trace_polys(trace1_polys, ood_trace1_states);
 
         // merge columns of constraint composition polynomial into the DEEP composition polynomial;
         deep_composition_poly.add_composition_poly(final_poly, ood_evaluations);
@@ -511,7 +512,7 @@ pub trait Prover {
         let constraint_queries = constraint_commitment.query(&query_positions);
 
         // build the proof object
-        let proof = channel.build_proof(trace_queries, constraint_queries, fri_proof);
+        let proof = channel.build_proof(trace_queries, trace1_queries, constraint_queries, fri_proof);
         #[cfg(feature = "std")]
         debug!("Built proof object in {} ms", now.elapsed().as_millis());
 

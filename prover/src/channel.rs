@@ -48,10 +48,8 @@ where
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     /// Creates a new prover channel for the specified `air` and public inputs.
-<<<<<<< HEAD
     pub fn new(air: &'a A, mut pub_inputs_elements: Vec<A::BaseField>) -> Self {
         let context = Context::new::<A::BaseField>(air.trace_info(), air.options().clone());
-=======
     pub fn new(
         air: &'a A,
         air1: &'a A,
@@ -64,7 +62,6 @@ where
             air.options().clone(),
             air1.options().clone(),
         );
->>>>>>> c90ff27 (first commit)
 
         // build a seed for the public coin; the initial seed is a hash of the proof context and
         // the public inputs, but as the protocol progresses, the coin will be reseeded with the
@@ -190,6 +187,7 @@ where
     pub fn build_proof(
         self,
         trace_queries: Vec<Queries>,
+        trace1_queries: Vec<Queries>,
         constraint_queries: Queries,
         fri_proof: FriProof,
     ) -> StarkProof {
@@ -198,6 +196,7 @@ where
             commitments: self.commitments,
             ood_frame: self.ood_frame,
             trace_queries,
+            trace1_queries,
             constraint_queries,
             fri_proof,
             pow_nonce: self.pow_nonce,

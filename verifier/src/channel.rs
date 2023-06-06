@@ -25,6 +25,7 @@ pub struct VerifierChannel<E: FieldElement, H: ElementHasher<BaseField = E::Base
     // trace queries
     trace_roots: Vec<H::Digest>,
     trace_queries: Option<TraceQueries<E, H>>,
+    trace1_queries: Option<TraceQueries<E, H>>,
     // constraint queries
     constraint_root: H::Digest,
     constraint_queries: Option<ConstraintQueries<E, H>>,
@@ -36,6 +37,7 @@ pub struct VerifierChannel<E: FieldElement, H: ElementHasher<BaseField = E::Base
     fri_num_partitions: usize,
     // out-of-domain frame
     ood_trace_frame: Option<TraceOodFrame<E>>,
+    ood_trace1_frame: Option<TraceOodFrame<E>>,
     ood_constraint_evaluations: Option<Vec<E>>,
     // query proof-of-work
     pow_nonce: u64,
@@ -47,12 +49,14 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     /// Creates and returns a new [VerifierChannel] initialized from the specified `proof`.
     pub fn new<A: Air<BaseField = E::BaseField>>(
         air: &A,
+        air1: &A,
         proof: StarkProof,
     ) -> Result<Self, VerifierError> {
         let StarkProof {
             context,
             commitments,
             trace_queries,
+            trace1_queries,
             constraint_queries,
             ood_frame,
             fri_proof,
@@ -64,6 +68,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             return Err(VerifierError::InconsistentBaseField);
         }
         let constraint_frame_width = air.context().num_constraint_composition_columns();
+        let constraint_frame1_width = air1.context().num_constraint_composition_columns();
 
         let num_trace_segments = air.trace_layout().num_segments();
         let main_trace_width = air.trace_layout().main_trace_width();
@@ -71,16 +76,22 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
         let lde_domain_size = air.lde_domain_size();
         let fri_options = air.options().to_fri_options();
 
+        let num_trace1_segments = air1.trace_layout().num_segments();
+        let main_trace1_width = air1.trace_layout().main_trace_width();
+        let aux_trace1_width = air1.trace_layout().aux_trace_width();
+
         // --- parse commitments ------------------------------------------------------------------
         let (trace_roots, constraint_root, fri_roots) = commitments
             .parse::<H>(
                 num_trace_segments,
+                //num_trace1_segments,
                 fri_options.num_fri_layers(lde_domain_size),
             )
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
 
         // --- parse trace and constraint queries -------------------------------------------------
         let trace_queries = TraceQueries::new(trace_queries, air)?;
+        let trace1_queries = TraceQueries::new(trace1_queries, air1)?;
         let constraint_queries = ConstraintQueries::new(constraint_queries, air)?;
 
         // --- parse FRI proofs -------------------------------------------------------------------
@@ -99,10 +110,17 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
         let ood_trace_frame =
             TraceOodFrame::new(ood_trace_evaluations, main_trace_width, aux_trace_width);
 
+        let (ood_trace1_evaluations, ood_constraint_evaluations) = ood_frame
+            .parse(main_trace1_width, aux_trace1_width, constraint_frame1_width)
+            .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
+        let ood_trace1_frame =
+            TraceOodFrame::new(ood_trace1_evaluations, main_trace1_width, aux_trace1_width);
+
         Ok(VerifierChannel {
             // trace queries
             trace_roots,
             trace_queries: Some(trace_queries),
+            trace1_queries: Some(trace1_queries),
             // constraint queries
             constraint_root,
             constraint_queries: Some(constraint_queries),
@@ -114,6 +132,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             fri_num_partitions,
             // out-of-domain evaluation
             ood_trace_frame: Some(ood_trace_frame),
+            ood_trace1_frame: Some(ood_trace_frame),
             ood_constraint_evaluations: Some(ood_constraint_evaluations),
             // query seed
             pow_nonce,
