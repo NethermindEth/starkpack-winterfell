@@ -248,6 +248,9 @@ pub trait Prover {
 
         // commit to the LDE of the main trace by writing the root of its Merkle tree into
         // the channel
+        // ****
+        // Here we may need to commit to all the traces
+        // probably there will be some problems on how the channel sends this to the verifier
         channel.commit_trace(*main_trace_tree.root());
 
         // initialize trace commitment and trace polynomial table structs with the main trace
@@ -308,6 +311,9 @@ pub trait Prover {
 
             // commit to the LDE of the extended auxiliary trace segment  by writing the root of
             // its Merkle tree into the channel
+            // ****
+            // Here we may need to commit to all the traces
+            // probably there will be some problems on how the channel sends this to the verifier
             channel.commit_trace(*aux_segment_tree.root());
 
             // append the segment to the trace commitment and trace polynomial table structs
@@ -369,6 +375,10 @@ pub trait Prover {
 
         let composition_poly1= constraint_evaluations1.into_poly()?;
         
+        // ****
+        // Why polynomials are added? shouldn't we extend this polynomials what are the soundness
+        // assumptions here?
+        // Review paper writeup
         let final_poly = composition_poly + composition_pol1;
 
         #[cfg(feature = "std")]
