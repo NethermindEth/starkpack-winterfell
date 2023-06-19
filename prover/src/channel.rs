@@ -48,8 +48,6 @@ where
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     /// Creates a new prover channel for the specified `air` and public inputs.
-    pub fn new(air: &'a A, mut pub_inputs_elements: Vec<A::BaseField>) -> Self {
-        let context = Context::new::<A::BaseField>(air.trace_info(), air.options().clone());
     pub fn new(
         air: &'a A,
         air1: &'a A,

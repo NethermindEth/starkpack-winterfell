@@ -67,7 +67,7 @@ impl Commitments {
         num_trace_segments: usize,
         //num_trace1_segments: usize,
         num_fri_layers: usize,
-    ) -> Result<(Vec<H::Digest>, Vec<H::Digest>, H::Digest, Vec<H::Digest>), DeserializationError>
+    ) -> Result<(Vec<H::Digest>, H::Digest, Vec<H::Digest>), DeserializationError>
     {
         let mut reader = SliceReader::new(&self.0);
 

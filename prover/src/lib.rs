@@ -55,13 +55,13 @@ pub use utils::{
 };
 
 use fri::FriProver;
-use utils::collections::Vec;
+use utils::{collections::Vec, batch_iter_mut};
 
 pub use math;
 use math::{
     fft::infer_degree,
     fields::{CubeExtension, QuadExtension},
-    ExtensibleField, FieldElement, StarkField, ToElements,
+    ExtensibleField, FieldElement, StarkField, ToElements, log2,
 };
 
 pub use crypto;
@@ -220,7 +220,7 @@ pub trait Prover {
         // verifier; the channel will be used to commit to values and to draw randomness that
         // should come from the verifier.
         let mut channel =
-            ProverChannel::<Self::Air, Self::Air, E, Self::HashFn, Self::RandomCoin>::new(
+            ProverChannel::<Self::Air, E, Self::HashFn, Self::RandomCoin>::new(
                 &air,
                 &air1,
                 pub_inputs_elements,
@@ -371,15 +371,15 @@ pub trait Prover {
         //   trace_length - 1
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let composition_poly = constraint_evaluations.into_poly()?;
+        let composition_poly = constraint_evaluations.into_poly(air.context().num_constraint_composition_columns())?;
+        let composition_poly1 = constraint_evaluations.into_poly(air1.context().num_constraint_composition_columns())?;
 
-        let composition_poly1= constraint_evaluations1.into_poly()?;
-        
         // ****
         // Why polynomials are added? shouldn't we extend this polynomials what are the soundness
         // assumptions here?
         // Review paper writeup
-        let final_poly = composition_poly + composition_pol1;
+        // Also composition polynomials don't have Add operator
+        let final_poly = composition_poly + composition_poly1;
 
         #[cfg(feature = "std")]
         debug!(
@@ -555,7 +555,7 @@ pub trait Prover {
         let trace_lde =
             RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace_polys, domain);
         let trace1_lde =
-            RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace_polys1, domain);
+            RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace1_polys, domain);
         #[cfg(feature = "std")]
         debug!(
             "Extended execution trace of {} columns from 2^{} to 2^{} steps ({}x blowup) in {} ms",
@@ -570,9 +570,14 @@ pub trait Prover {
         #[cfg(feature = "std")]
         let now = Instant::now();
         //let trace_tree = trace_lde.commit_to_rows();
+        // ****
+        // Why using an unsafe function here? it doesn't seems right
         let mut row_hashes = unsafe { uninit_vector::<H::Digest>(trace_lde.num_rows()) };
 
         // iterate though matrix rows, hashing each row
+        // ****
+        // Why the minimum batch size is 128?
+        // Let's find another way to do this
         batch_iter_mut!(
             &mut row_hashes,
             128, // min batch size
@@ -587,7 +592,7 @@ pub trait Prover {
         );
 
         // build Merkle tree out of hashed rows
-        let trace_tree = MerkleTree::new(row_hashes).expect("failed to construct trace Merkle tree")
+        let trace_tree = MerkleTree::new(row_hashes).expect("failed to construct trace Merkle tree");
         #[cfg(feature = "std")]
         debug!(
             "Computed execution trace commitment (Merkle tree of depth {}) in {} ms",
