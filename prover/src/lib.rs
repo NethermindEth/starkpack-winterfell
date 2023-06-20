@@ -193,7 +193,7 @@ pub trait Prover {
     fn generate_proof<E>(
         &self,
         mut trace: Self::Trace,
-    
+
         mut trace1: Self::Trace,
     ) -> Result<StarkProof, ProverError>
     where
@@ -205,7 +205,6 @@ pub trait Prover {
         let pub_inputs = self.get_pub_inputs(&trace);
         let pub_inputs_elements = pub_inputs.to_elements();
 
-        
         let pub_inputs1 = self.get_pub_inputs(&trace1);
         let pub_inputs_elements1 = pub_inputs1.to_elements();
 
@@ -244,7 +243,11 @@ pub trait Prover {
 
         // extend the main execution trace and build a Merkle tree from the extended trace
         let (main_trace_lde, main_trace1_lde, main_trace_tree, main_trace_polys, main_trace1_polys) =
-            self.build_trace_commitment::<Self::BaseField>(trace.main_segment(),trace1.main_segment(), &domain);
+            self.build_trace_commitment::<Self::BaseField>(
+                trace.main_segment(),
+                trace1.main_segment(),
+                &domain,
+            );
 
         // commit to the LDE of the main trace by writing the root of its Merkle tree into
         // the channel
@@ -279,6 +282,7 @@ pub trait Prover {
             // draw a set of random elements required to build an auxiliary trace segment
             let rand_elements = channel.get_aux_trace_segment_rand_elements(i);
 
+            let rand_elements1 = channel.get_aux_trace_segment_rand_elements(i);
             // build the trace segment
             let aux_segment = trace
                 .build_aux_segment(&aux_trace_segments, &rand_elements)
@@ -291,7 +295,7 @@ pub trait Prover {
                 now.elapsed().as_millis()
             );
             let aux_segment1 = trace1
-                .build_aux_segment(&aux_trace1_segments, &rand_elements)
+                .build_aux_segment(&aux_trace1_segments, &rand_elements1)
                 .expect("failed build auxiliary trace segment");
             #[cfg(feature = "std")]
             debug!(
@@ -301,10 +305,14 @@ pub trait Prover {
                 now.elapsed().as_millis()
             );
 
-
             // extend the auxiliary trace segment and build a Merkle tree from the extended trace
-            let (aux_segment_lde, aux_segment1_lde, aux_segment_tree, aux_segment_polys, aux_segment1_polys) =
-                self.build_trace_commitment::<E>(&aux_segment,&aux_segment1, &domain);
+            let (
+                aux_segment_lde,
+                aux_segment1_lde,
+                aux_segment_tree,
+                aux_segment_polys,
+                aux_segment1_polys,
+            ) = self.build_trace_commitment::<E>(&aux_segment, &aux_segment1, &domain);
 
             // commit to the LDE of the extended auxiliary trace segment  by writing the root of
             // its Merkle tree into the channel
@@ -319,8 +327,8 @@ pub trait Prover {
             aux_trace_segments.push(aux_segment);
 
             trace1_polys.add_aux_segment(aux_segment1_polys);
-            aux_trace1_rand_elements.add_segment_elements(rand_elements);
-            aux_trace1_segments.push(aux_segment);
+            aux_trace1_rand_elements.add_segment_elements(rand_elements1);
+            aux_trace1_segments.push(aux_segment1);
         }
 
         // make sure the specified trace (including auxiliary segments) is valid against the AIR.
@@ -345,7 +353,8 @@ pub trait Prover {
         let constraint_evaluations = evaluator.evaluate(trace_commitment.trace_table(), &domain);
 
         let constraint_coeffs1 = channel.get_constraint_composition_coeffs();
-        let evaluator1 = ConstraintEvaluator::new(&air1, aux_trace1_rand_elements, constraint_coeffs1);
+        let evaluator1 =
+            ConstraintEvaluator::new(&air1, aux_trace1_rand_elements, constraint_coeffs1);
         let constraint_evaluations1 = evaluator1.evaluate(trace1_commitment.trace_table(), &domain);
 
         #[cfg(feature = "std")]
@@ -367,9 +376,9 @@ pub trait Prover {
         let now = Instant::now();
         let composition_poly = constraint_evaluations.into_poly()?;
 
-        let composition_poly1= constraint_evaluations1.into_poly()?;
-        
-        let final_poly = composition_poly + composition_pol1;
+        let composition_poly1 = constraint_evaluations1.into_poly()?;
+
+        let final_poly = composition_poly + composition_poly1;
 
         #[cfg(feature = "std")]
         debug!(
@@ -384,8 +393,7 @@ pub trait Prover {
         //    self.build_constraint_commitment::<E>(&composition_poly, &domain);
         //let constraint_commitment1 =
         //    self.build_constraint_commitment::<E>(&composition_poly1, &domain);
-        let constraint_commitment =
-            self.build_constraint_commitment::<E>(&final_poly,  &domain);
+        let constraint_commitment = self.build_constraint_commitment::<E>(&final_poly, &domain);
         // then, commit to the evaluations of constraints by writing the root of the constraint
         // Merkle tree into the channel
         channel.commit_constraints(constraint_commitment.root());
@@ -415,7 +423,6 @@ pub trait Prover {
         //let ood_evaluations = composition_poly.evaluate_at(z);
         let ood_evaluations = final_poly.evaluate_at(z);
         channel.send_ood_constraint_evaluations(&ood_evaluations);
-
 
         // draw random coefficients to use during DEEP polynomial composition, and use them to
         // initialize the DEEP composition polynomial
@@ -451,7 +458,7 @@ pub trait Prover {
         #[cfg(feature = "std")]
         let now = Instant::now();
         //let deep_evaluations = deep_composition_poly.evaluate(&domain);
-        let deep_evaluations = final_poly.evaluate(&domain);
+        let deep_evaluations = deep_composition_poly.evaluate(&domain);
         // we check the following condition in debug mode only because infer_degree is an expensive
         // operation
         debug_assert_eq!(
@@ -512,7 +519,8 @@ pub trait Prover {
         let constraint_queries = constraint_commitment.query(&query_positions);
 
         // build the proof object
-        let proof = channel.build_proof(trace_queries, trace1_queries, constraint_queries, fri_proof);
+        let proof =
+            channel.build_proof(trace_queries, trace1_queries, constraint_queries, fri_proof);
         #[cfg(feature = "std")]
         debug!("Built proof object in {} ms", now.elapsed().as_millis());
 
@@ -533,7 +541,13 @@ pub trait Prover {
         trace: &ColMatrix<E>,
         trace1: &ColMatrix<E>,
         domain: &StarkDomain<Self::BaseField>,
-    ) -> (RowMatrix<E>, RowMatrix<E>, MerkleTree<Self::HashFn>, ColMatrix<E>, ColMatrix<E>)
+    ) -> (
+        RowMatrix<E>,
+        RowMatrix<E>,
+        MerkleTree<Self::HashFn>,
+        ColMatrix<E>,
+        ColMatrix<E>,
+    )
     where
         E: FieldElement<BaseField = Self::BaseField>,
     {
@@ -545,7 +559,7 @@ pub trait Prover {
         let trace_lde =
             RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace_polys, domain);
         let trace1_lde =
-            RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace_polys1, domain);
+            RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace1_polys, domain);
         #[cfg(feature = "std")]
         debug!(
             "Extended execution trace of {} columns from 2^{} to 2^{} steps ({}x blowup) in {} ms",
@@ -559,25 +573,8 @@ pub trait Prover {
         // build trace commitment
         #[cfg(feature = "std")]
         let now = Instant::now();
-        //let trace_tree = trace_lde.commit_to_rows();
-        let mut row_hashes = unsafe { uninit_vector::<H::Digest>(trace_lde.num_rows()) };
+        let trace_tree = trace_lde.commit_to_comb_rows(trace1_lde);
 
-        // iterate though matrix rows, hashing each row
-        batch_iter_mut!(
-            &mut row_hashes,
-            128, // min batch size
-            |batch: &mut [H::Digest], batch_offset: usize| {
-                for (i, row_hash) in batch.iter_mut().enumerate() {
-                    let trace_row = trace_lde.row(batch_offset + i);
-                    let trace1_row = trace_lde1.row(batch_offset + i);
-                    let comb_rows = [trace_row, trace1_row].concat();
-                    *row_hash = H::hash_elements(comb_rows);
-                }
-            }
-        );
-
-        // build Merkle tree out of hashed rows
-        let trace_tree = MerkleTree::new(row_hashes).expect("failed to construct trace Merkle tree")
         #[cfg(feature = "std")]
         debug!(
             "Computed execution trace commitment (Merkle tree of depth {}) in {} ms",

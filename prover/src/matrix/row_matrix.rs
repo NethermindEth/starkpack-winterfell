@@ -179,6 +179,7 @@ impl<E: FieldElement> RowMatrix<E> {
     ///   becomes a leaf in the tree. Thus, the number of leaves in the tree is equal to the
     ///   number of rows in the matrix.
     /// * The resulting Merkle tree is returned as the commitment to the entire matrix.
+
     pub fn commit_to_rows<H>(&self) -> MerkleTree<H>
     where
         H: ElementHasher<BaseField = E::BaseField>,
@@ -193,6 +194,31 @@ impl<E: FieldElement> RowMatrix<E> {
             |batch: &mut [H::Digest], batch_offset: usize| {
                 for (i, row_hash) in batch.iter_mut().enumerate() {
                     *row_hash = H::hash_elements(self.row(batch_offset + i));
+                }
+            }
+        );
+
+        // build Merkle tree out of hashed rows
+        MerkleTree::new(row_hashes).expect("failed to construct trace Merkle tree")
+    }
+    pub fn commit_to_comb_rows<H>(&self, trace1_lde: RowMatrix<E>) -> MerkleTree<H>
+    where
+        H: ElementHasher<BaseField = E::BaseField>,
+    {
+        // allocate vector to store row hashes
+
+        let mut row_hashes = unsafe { uninit_vector::<H::Digest>(self.num_rows()) };
+
+        // iterate though matrix rows, hashing each row
+        batch_iter_mut!(
+            &mut row_hashes,
+            128, // min batch size
+            |batch: &mut [H::Digest], batch_offset: usize| {
+                for (i, row_hash) in batch.iter_mut().enumerate() {
+                    let trace_row = self.row(batch_offset + i);
+                    let trace1_row = trace1_lde.row(batch_offset + i);
+                    let comb_rows = [trace1_row, trace1_row].concat();
+                    *row_hash = H::hash_elements(&comb_rows);
                 }
             }
         );

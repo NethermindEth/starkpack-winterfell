@@ -56,6 +56,7 @@ pub struct StarkProof {
     /// Decommitments of extended execution trace values (for all trace segments) at position
     ///  queried by the verifier.
     pub trace_queries: Vec<Queries>,
+    pub trace1_queries: Vec<Queries>,
     /// Decommitments of constraint composition polynomial evaluations at positions queried by
     /// the verifier.
     pub constraint_queries: Queries,
@@ -134,6 +135,7 @@ impl StarkProof {
         self.context.write_into(&mut result);
         self.commitments.write_into(&mut result);
         self.trace_queries.write_into(&mut result);
+        self.trace1_queries.write_into(&mut result);
         self.constraint_queries.write_into(&mut result);
         self.ood_frame.write_into(&mut result);
         self.fri_proof.write_into(&mut result);
@@ -161,11 +163,18 @@ impl StarkProof {
             trace_queries.push(Queries::read_from(&mut source)?);
         }
 
+        let num_trace1_segments = context.trace_layout().num_segments();
+        let mut trace1_queries = Vec::with_capacity(num_trace1_segments);
+        for _ in 0..num_trace1_segments {
+            trace1_queries.push(Queries::read_from(&mut source)?);
+        }
+
         // parse the rest of the proof
         let proof = StarkProof {
             context,
             commitments,
             trace_queries,
+            trace1_queries,
             constraint_queries: Queries::read_from(&mut source)?,
             ood_frame: OodFrame::read_from(&mut source)?,
             fri_proof: FriProof::read_from(&mut source)?,

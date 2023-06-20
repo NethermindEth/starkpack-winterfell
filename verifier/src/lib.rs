@@ -106,7 +106,7 @@ where
     match air.options().field_extension() {
         FieldExtension::None => {
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&air, air1, proof)?;
+            let channel = VerifierChannel::new(&air, &air1, proof)?;
             perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, air1, channel, public_coin)
         },
         FieldExtension::Quadratic => {
@@ -114,7 +114,7 @@ where
                 return Err(VerifierError::UnsupportedFieldExtension(2));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&air, air1, proof)?;
+            let channel = VerifierChannel::new(&air, &air1, proof)?;
             perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(air, air1, channel, public_coin)
         },
         FieldExtension::Cubic => {
@@ -122,7 +122,7 @@ where
                 return Err(VerifierError::UnsupportedFieldExtension(3));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&air, air1, proof)?;
+            let channel = VerifierChannel::new(&air, &air1, proof)?;
             perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(air, air1, channel, public_coin)
         },
     }

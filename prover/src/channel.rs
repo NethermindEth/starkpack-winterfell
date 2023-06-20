@@ -27,8 +27,10 @@ where
     R: RandomCoin<BaseField = E::BaseField, Hasher = H>,
 {
     air: &'a A,
+    air1: &'a A,
     public_coin: R,
     context: Context,
+    context1: Context,
     commitments: Commitments,
     ood_frame: OodFrame,
     pow_nonce: u64,
@@ -48,20 +50,14 @@ where
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     /// Creates a new prover channel for the specified `air` and public inputs.
-    pub fn new(air: &'a A, mut pub_inputs_elements: Vec<A::BaseField>) -> Self {
-        let context = Context::new::<A::BaseField>(air.trace_info(), air.options().clone());
     pub fn new(
         air: &'a A,
         air1: &'a A,
         mut pub_inputs_elements: Vec<A::BaseField>,
         mut pub_inputs_elements1: Vec<A::BaseField>,
     ) -> Self {
-        let context = Context::new::<A::BaseField>(
-            air.trace_info(),
-            air1.trace_info(),
-            air.options().clone(),
-            air1.options().clone(),
-        );
+        let context = Context::new::<A::BaseField>(air.trace_info(), air.options().clone());
+        let context1 = Context::new::<A::BaseField>(air1.trace_info(), air1.options().clone());
 
         // build a seed for the public coin; the initial seed is a hash of the proof context and
         // the public inputs, but as the protocol progresses, the coin will be reseeded with the
@@ -73,8 +69,10 @@ where
 
         ProverChannel {
             air,
+            air1,
             public_coin: RandomCoin::new(&coin_seed_elements),
             context,
+            context1,
             commitments: Commitments::default(),
             ood_frame: OodFrame::default(),
             pow_nonce: 0,
