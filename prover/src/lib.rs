@@ -55,13 +55,13 @@ pub use utils::{
 };
 
 use fri::FriProver;
-use utils::collections::Vec;
+use utils::{collections::Vec, batch_iter_mut};
 
 pub use math;
 use math::{
     fft::infer_degree,
     fields::{CubeExtension, QuadExtension},
-    ExtensibleField, FieldElement, StarkField, ToElements,
+    ExtensibleField, FieldElement, StarkField, ToElements, log2,
 };
 
 pub use crypto;
@@ -219,7 +219,7 @@ pub trait Prover {
         // verifier; the channel will be used to commit to values and to draw randomness that
         // should come from the verifier.
         let mut channel =
-            ProverChannel::<Self::Air, Self::Air, E, Self::HashFn, Self::RandomCoin>::new(
+            ProverChannel::<Self::Air, E, Self::HashFn, Self::RandomCoin>::new(
                 &air,
                 &air1,
                 pub_inputs_elements,
@@ -251,6 +251,9 @@ pub trait Prover {
 
         // commit to the LDE of the main trace by writing the root of its Merkle tree into
         // the channel
+        // ****
+        // Here we may need to commit to all the traces
+        // probably there will be some problems on how the channel sends this to the verifier
         channel.commit_trace(*main_trace_tree.root());
 
         // initialize trace commitment and trace polynomial table structs with the main trace
@@ -316,6 +319,9 @@ pub trait Prover {
 
             // commit to the LDE of the extended auxiliary trace segment  by writing the root of
             // its Merkle tree into the channel
+            // ****
+            // Here we may need to commit to all the traces
+            // probably there will be some problems on how the channel sends this to the verifier
             channel.commit_trace(*aux_segment_tree.root());
 
             // append the segment to the trace commitment and trace polynomial table structs
@@ -374,10 +380,19 @@ pub trait Prover {
         //   trace_length - 1
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let composition_poly = constraint_evaluations.into_poly()?;
+        let composition_poly = constraint_evaluations.into_poly(air.context().num_constraint_composition_columns())?;
+        let composition_poly1 = constraint_evaluations.into_poly(air1.context().num_constraint_composition_columns())?;
 
+<<<<<<< HEAD
         let composition_poly1 = constraint_evaluations1.into_poly()?;
 
+=======
+        // ****
+        // Why polynomials are added? shouldn't we extend this polynomials what are the soundness
+        // assumptions here?
+        // Review paper writeup
+        // Also composition polynomials don't have Add operator
+>>>>>>> 02435d859f3511e2041ae5dc193348616e42b049
         let final_poly = composition_poly + composition_poly1;
 
         #[cfg(feature = "std")]
@@ -573,8 +588,35 @@ pub trait Prover {
         // build trace commitment
         #[cfg(feature = "std")]
         let now = Instant::now();
+<<<<<<< HEAD
         let trace_tree = trace_lde.commit_to_comb_rows(trace1_lde);
 
+=======
+        //let trace_tree = trace_lde.commit_to_rows();
+        // ****
+        // Why using an unsafe function here? it doesn't seems right
+        let mut row_hashes = unsafe { uninit_vector::<H::Digest>(trace_lde.num_rows()) };
+
+        // iterate though matrix rows, hashing each row
+        // ****
+        // Why the minimum batch size is 128?
+        // Let's find another way to do this
+        batch_iter_mut!(
+            &mut row_hashes,
+            128, // min batch size
+            |batch: &mut [H::Digest], batch_offset: usize| {
+                for (i, row_hash) in batch.iter_mut().enumerate() {
+                    let trace_row = trace_lde.row(batch_offset + i);
+                    let trace1_row = trace_lde1.row(batch_offset + i);
+                    let comb_rows = [trace_row, trace1_row].concat();
+                    *row_hash = H::hash_elements(comb_rows);
+                }
+            }
+        );
+
+        // build Merkle tree out of hashed rows
+        let trace_tree = MerkleTree::new(row_hashes).expect("failed to construct trace Merkle tree");
+>>>>>>> 02435d859f3511e2041ae5dc193348616e42b049
         #[cfg(feature = "std")]
         debug!(
             "Computed execution trace commitment (Merkle tree of depth {}) in {} ms",
