@@ -67,12 +67,7 @@ impl Commitments {
         num_trace_segments: usize,
         //num_trace1_segments: usize,
         num_fri_layers: usize,
-<<<<<<< HEAD
     ) -> Result<(Vec<H::Digest>, H::Digest, Vec<H::Digest>), DeserializationError> {
-=======
-    ) -> Result<(Vec<H::Digest>, H::Digest, Vec<H::Digest>), DeserializationError>
-    {
->>>>>>> 02435d859f3511e2041ae5dc193348616e42b049
         let mut reader = SliceReader::new(&self.0);
 
         // parse trace commitments
