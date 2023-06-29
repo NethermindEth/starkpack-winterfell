@@ -55,13 +55,14 @@ pub use utils::{
 };
 
 use fri::FriProver;
-use utils::{collections::Vec, batch_iter_mut};
+use utils::{batch_iter_mut, collections::Vec};
 
 pub use math;
 use math::{
+    add_in_place,
     fft::infer_degree,
     fields::{CubeExtension, QuadExtension},
-    ExtensibleField, FieldElement, StarkField, ToElements, log2,
+    log2, ExtensibleField, FieldElement, StarkField, ToElements,
 };
 
 pub use crypto;
@@ -218,13 +219,12 @@ pub trait Prover {
         // create a channel which is used to simulate interaction between the prover and the
         // verifier; the channel will be used to commit to values and to draw randomness that
         // should come from the verifier.
-        let mut channel =
-            ProverChannel::<Self::Air, E, Self::HashFn, Self::RandomCoin>::new(
-                &air,
-                &air1,
-                pub_inputs_elements,
-                pub_inputs_elements1,
-            );
+        let mut channel = ProverChannel::<Self::Air, E, Self::HashFn, Self::RandomCoin>::new(
+            &air,
+            &air1,
+            pub_inputs_elements,
+            pub_inputs_elements1,
+        );
         //Shoulf be changed for multiple pub_inputs
         //probably already done
 
@@ -380,26 +380,24 @@ pub trait Prover {
         //   trace_length - 1
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let composition_poly = constraint_evaluations.into_poly(air.context().num_constraint_composition_columns())?;
-        let composition_poly1 = constraint_evaluations.into_poly(air1.context().num_constraint_composition_columns())?;
-
-<<<<<<< HEAD
-        let composition_poly1 = constraint_evaluations1.into_poly()?;
-
-=======
-        // ****
-        // Why polynomials are added? shouldn't we extend this polynomials what are the soundness
-        // assumptions here?
-        // Review paper writeup
-        // Also composition polynomials don't have Add operator
->>>>>>> 02435d859f3511e2041ae5dc193348616e42b049
-        let final_poly = composition_poly + composition_poly1;
+        let (composition_poly, trace_length, num_cols) = constraint_evaluations
+            .into_comb_poly(air.context().num_constraint_composition_columns());
+        let (composition_poly1, trace1_length, num_cols1) = constraint_evaluations1
+            .into_comb_poly(air1.context().num_constraint_composition_columns());
+        //let final_coef = col_composition_poly + col_composition_poly1;
+        let mut final_comb_poly = composition_poly;
+        //for (i, (val, val1)) in composition_poly.iter().zip(composition_poly1).enumerate() {
+        //    final_comb_poly[i] = *val + val1;
+        //}
+        add_in_place(&mut final_comb_poly, &composition_poly1);
+        let final_poly =
+            constraint_evaluations.into_poly(final_comb_poly, trace_length, num_cols)?;
 
         #[cfg(feature = "std")]
         debug!(
             "Converted constraint evaluations into {} composition polynomial columns of degree {} in {} ms",
-            composition_poly.num_columns(),
-            composition_poly.column_degree(),
+            final_poly.num_columns(),
+            final_poly.column_degree(),
             now.elapsed().as_millis()
         );
 
@@ -454,7 +452,9 @@ pub trait Prover {
 
         // raise the degree of the DEEP composition polynomial by one to make sure it is equal to
         // trace_length - 1
-        deep_composition_poly.adjust_degree();
+        ////***
+        /// The Original winterfell removed deree adjustment
+        //deep_composition_poly.adjust_degree();
 
         #[cfg(feature = "std")]
         debug!(
@@ -588,35 +588,8 @@ pub trait Prover {
         // build trace commitment
         #[cfg(feature = "std")]
         let now = Instant::now();
-<<<<<<< HEAD
         let trace_tree = trace_lde.commit_to_comb_rows(trace1_lde);
 
-=======
-        //let trace_tree = trace_lde.commit_to_rows();
-        // ****
-        // Why using an unsafe function here? it doesn't seems right
-        let mut row_hashes = unsafe { uninit_vector::<H::Digest>(trace_lde.num_rows()) };
-
-        // iterate though matrix rows, hashing each row
-        // ****
-        // Why the minimum batch size is 128?
-        // Let's find another way to do this
-        batch_iter_mut!(
-            &mut row_hashes,
-            128, // min batch size
-            |batch: &mut [H::Digest], batch_offset: usize| {
-                for (i, row_hash) in batch.iter_mut().enumerate() {
-                    let trace_row = trace_lde.row(batch_offset + i);
-                    let trace1_row = trace_lde1.row(batch_offset + i);
-                    let comb_rows = [trace_row, trace1_row].concat();
-                    *row_hash = H::hash_elements(comb_rows);
-                }
-            }
-        );
-
-        // build Merkle tree out of hashed rows
-        let trace_tree = MerkleTree::new(row_hashes).expect("failed to construct trace Merkle tree");
->>>>>>> 02435d859f3511e2041ae5dc193348616e42b049
         #[cfg(feature = "std")]
         debug!(
             "Computed execution trace commitment (Merkle tree of depth {}) in {} ms",
