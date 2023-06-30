@@ -21,6 +21,7 @@ const MIN_FRAGMENT_SIZE: usize = 16;
 // CONSTRAINT EVALUATION TABLE
 // ================================================================================================
 
+#[derive(Clone)]
 pub struct ConstraintEvaluationTable<'a, E: FieldElement> {
     evaluations: Vec<Vec<E>>,
     divisors: Vec<ConstraintDivisor<E::BaseField>>,

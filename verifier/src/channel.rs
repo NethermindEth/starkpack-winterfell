@@ -133,7 +133,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             fri_num_partitions,
             // out-of-domain evaluation
             ood_trace_frame: Some(ood_trace_frame),
-            ood_trace1_frame: Some(ood_trace_frame),
+            ood_trace1_frame: Some(ood_trace1_frame),
             ood_constraint_evaluations: Some(ood_constraint_evaluations),
             // query seed
             pow_nonce,

@@ -254,11 +254,17 @@ pub trait Prover {
         // ****
         // Here we may need to commit to all the traces
         // probably there will be some problems on how the channel sends this to the verifier
+
+        //I create the clone of the main trace tree
+        // manually as the #derive(Clone) didn't work
+        let main_trace1_tree = main_trace_tree.clone();
         channel.commit_trace(*main_trace_tree.root());
 
         // initialize trace commitment and trace polynomial table structs with the main trace
         // data; for multi-segment traces these structs will be used as accumulators of all
         // trace segments
+
+        //let main_trace1_tree = &main_trace_tree;
         let mut trace_commitment = TraceCommitment::new(
             main_trace_lde,
             main_trace_tree,
@@ -266,7 +272,7 @@ pub trait Prover {
         );
         let mut trace1_commitment = TraceCommitment::new(
             main_trace1_lde,
-            main_trace_tree,
+            main_trace1_tree,
             domain.trace_to_lde_blowup(),
         );
         let mut trace_polys = TracePolyTable::new(main_trace_polys);
@@ -322,11 +328,15 @@ pub trait Prover {
             // ****
             // Here we may need to commit to all the traces
             // probably there will be some problems on how the channel sends this to the verifier
+
+            //The aux_tree is also one for all of the trace
+            // so we should clone it too.
+            let aux_segment1_tree = aux_segment_tree.clone();
             channel.commit_trace(*aux_segment_tree.root());
 
             // append the segment to the trace commitment and trace polynomial table structs
             trace_commitment.add_segment(aux_segment_lde, aux_segment_tree);
-            trace1_commitment.add_segment(aux_segment1_lde, aux_segment_tree);
+            trace1_commitment.add_segment(aux_segment1_lde, aux_segment1_tree);
 
             trace_polys.add_aux_segment(aux_segment_polys);
             aux_trace_rand_elements.add_segment_elements(rand_elements);
@@ -363,6 +373,9 @@ pub trait Prover {
             ConstraintEvaluator::new(&air1, aux_trace1_rand_elements, constraint_coeffs1);
         let constraint_evaluations1 = evaluator1.evaluate(trace1_commitment.trace_table(), &domain);
 
+        // We need to combine all comp polys into one final polynomial.
+        let final_evaluations = constraint_evaluations.clone();
+
         #[cfg(feature = "std")]
         debug!(
             "Evaluated constraints over domain of 2^{} elements in {} ms",
@@ -390,8 +403,7 @@ pub trait Prover {
         //    final_comb_poly[i] = *val + val1;
         //}
         add_in_place(&mut final_comb_poly, &composition_poly1);
-        let final_poly =
-            constraint_evaluations.into_poly(final_comb_poly, trace_length, num_cols)?;
+        let final_poly = final_evaluations.into_poly(final_comb_poly, trace_length, num_cols)?;
 
         #[cfg(feature = "std")]
         debug!(
@@ -452,8 +464,9 @@ pub trait Prover {
 
         // raise the degree of the DEEP composition polynomial by one to make sure it is equal to
         // trace_length - 1
-        ////***
-        /// The Original winterfell removed deree adjustment
+
+        //
+        // The Original winterfell removed deree adjustment
         //deep_composition_poly.adjust_degree();
 
         #[cfg(feature = "std")]
@@ -586,9 +599,10 @@ pub trait Prover {
         );
 
         // build trace commitment
+        let trace1_lde_clone = trace1_lde.clone();
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let trace_tree = trace_lde.commit_to_comb_rows(trace1_lde);
+        let trace_tree = trace_lde.commit_to_comb_rows(trace1_lde_clone);
 
         #[cfg(feature = "std")]
         debug!(
