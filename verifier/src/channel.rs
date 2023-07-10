@@ -24,8 +24,8 @@ use utils::{collections::Vec, string::ToString};
 pub struct VerifierChannel<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     // trace queries
     trace_roots: Vec<H::Digest>,
-    trace_queries: Option<TraceQueries<E, H>>,
-    trace1_queries: Option<TraceQueries<E, H>>,
+    pub trace_queries: Option<TraceQueries<E, H>>,
+    pub trace1_queries: Option<TraceQueries<E, H>>,
     // constraint queries
     constraint_root: H::Digest,
     constraint_queries: Option<ConstraintQueries<E, H>>,
@@ -105,7 +105,6 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
 
         // --- parse out-of-domain evaluation frame -----------------------------------------------
-
         let (ood_trace_evaluations, ood_constraint_evaluations) = ood_frame
             .parse(main_trace_width, aux_trace_width, constraint_frame_width)
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;

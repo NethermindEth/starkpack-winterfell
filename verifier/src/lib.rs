@@ -113,14 +113,14 @@ where
             //println!("Trace root on Verifier Channel:\n{:?}", trace_roots);
             //let constraint_root = channel.constraint_root;//.clone();
             //println!("constraint root on Verifier Channel:\n{:?}", constraint_root);
-            let ood_state = channel.ood_trace_frame.clone();
-            println!("ood_frame from the Verifier Channel:\n{:?}", ood_state);
+            //let ood_state = channel.ood_trace_frame.clone();
+            //println!("ood_frame from the Verifier Channel:\n{:?}", ood_state);
             //let ood_state1 = channel.ood_trace1_frame.clone();
             //println!("ood_frame1 from the Verifier Channel:\n{:?}", ood_state1);
             //let ood_evals = channel.ood_constraint_evaluations.clone();
             //println!("ood_evals from the Verifier Channel:\n{:?}", ood_evals);
-            //let trace_q = channel.trace_queries;//.clone();
-            //println!("trace_querries from the Verifier Channel:\n{:?}", trace_q);
+            let trace_q = channel.trace_queries;//.clone();
+            println!("trace_querries from the Verifier Channel:\n{:?}", trace_q);
             perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, air1, channel, public_coin)
         },
         FieldExtension::Quadratic => {

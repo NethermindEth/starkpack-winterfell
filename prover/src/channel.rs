@@ -113,6 +113,7 @@ where
     /// point. This also reseeds the public coin wit the hash of the evaluations.
     pub fn send_ood_constraint_evaluations(&mut self, evaluations: &[E]) {
         self.ood_frame.set_constraint_evaluations(evaluations);
+        self.ood_frame1.set_constraint_evaluations(evaluations);
         self.public_coin.reseed(H::hash_elements(evaluations));
     }
 

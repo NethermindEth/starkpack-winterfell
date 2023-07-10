@@ -473,7 +473,6 @@ pub trait Prover {
         // polynomial
         deep_composition_poly.add_trace_polys(trace_polys, ood_trace_states);
         deep_composition_poly.add_trace_polys(trace1_polys, ood_trace1_states);
-
         // merge columns of constraint composition polynomial into the DEEP composition polynomial;
         deep_composition_poly.add_composition_poly(final_poly, ood_evaluations);
 

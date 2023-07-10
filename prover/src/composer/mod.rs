@@ -65,7 +65,7 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
         trace_polys: TracePolyTable<E>,
         ood_trace_states: Vec<Vec<E>>,
     ) {
-        assert!(self.coefficients.is_empty());
+        //assert!(self.coefficients.is_empty());
 
         // compute a second out-of-domain point offset from z by exactly trace generator; this
         // point defines the "next" computation state in relation to point z
