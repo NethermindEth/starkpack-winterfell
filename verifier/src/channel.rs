@@ -30,17 +30,17 @@ pub struct VerifierChannel<E: FieldElement, H: ElementHasher<BaseField = E::Base
     constraint_root: H::Digest,
     constraint_queries: Option<ConstraintQueries<E, H>>,
     // FRI proof
-    fri_roots: Option<Vec<H::Digest>>,
-    fri_layer_proofs: Vec<BatchMerkleProof<H>>,
-    fri_layer_queries: Vec<Vec<E>>,
-    fri_remainder: Option<Vec<E>>,
-    fri_num_partitions: usize,
+    pub fri_roots: Option<Vec<H::Digest>>,
+    pub fri_layer_proofs: Vec<BatchMerkleProof<H>>,
+    pub fri_layer_queries: Vec<Vec<E>>,
+    pub fri_remainder: Option<Vec<E>>,
+    pub fri_num_partitions: usize,
     // out-of-domain frame
-    ood_trace_frame: Option<TraceOodFrame<E>>,
-    ood_trace1_frame: Option<TraceOodFrame<E>>,
-    ood_constraint_evaluations: Option<Vec<E>>,
+    pub ood_trace_frame: Option<TraceOodFrame<E>>,
+    pub ood_trace1_frame: Option<TraceOodFrame<E>>,
+    pub ood_constraint_evaluations: Option<Vec<E>>,
     // query proof-of-work
-    pow_nonce: u64,
+    pub pow_nonce: u64,
 }
 
 impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChannel<E, H> {
@@ -59,6 +59,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             trace1_queries,
             constraint_queries,
             ood_frame,
+            ood_frame1,
             fri_proof,
             pow_nonce,
         } = proof;
@@ -104,14 +105,14 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
 
         // --- parse out-of-domain evaluation frame -----------------------------------------------
+
         let (ood_trace_evaluations, ood_constraint_evaluations) = ood_frame
-            .clone()
             .parse(main_trace_width, aux_trace_width, constraint_frame_width)
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
         let ood_trace_frame =
             TraceOodFrame::new(ood_trace_evaluations, main_trace_width, aux_trace_width);
 
-        let (ood_trace1_evaluations, ood_constraint_evaluations) = ood_frame
+        let (ood_trace1_evaluations, ood_constraint_evaluations1) = ood_frame1
             .parse(main_trace1_width, aux_trace1_width, constraint_frame1_width)
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
         let ood_trace1_frame =
@@ -161,8 +162,10 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     ///
     /// For computations requiring multiple trace segments, evaluations of auxiliary trace
     /// polynomials are also included.
-    pub fn read_ood_trace_frame(&mut self) -> TraceOodFrame<E> {
-        self.ood_trace_frame.take().expect("already read")
+    pub fn read_ood_trace_frame(&mut self) -> (TraceOodFrame<E>, TraceOodFrame<E>) {
+        let trace_ood_frame = self.ood_trace_frame.take().expect("already read");
+        let trace1_ood_frame = self.ood_trace1_frame.take().expect("already read");
+        (trace_ood_frame, trace1_ood_frame)
     }
 
     /// Returns evaluations of composition polynomial columns at z^m, where z is the out-of-domain
@@ -255,6 +258,7 @@ where
 /// * Merkle authentication paths for all queries.
 ///
 /// Trace states for all auxiliary segments are stored in a single table.
+#[derive(Debug)]
 struct TraceQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     query_proofs: Vec<BatchMerkleProof<H>>,
     main_states: Table<E::BaseField>,
@@ -332,6 +336,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
 /// Container of constraint evaluation query data, including:
 /// * Queried constraint evaluation values.
 /// * Merkle authentication paths for all queries.
+#[derive(Debug, Clone)]
 struct ConstraintQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     query_proofs: BatchMerkleProof<H>,
     evaluations: Table<E>,
@@ -364,7 +369,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> ConstraintQuer
 
 // TRACE OUT-OF-DOMAIN FRAME
 // ================================================================================================
-
+#[derive(Debug, Clone)]
 pub struct TraceOodFrame<E: FieldElement> {
     values: Vec<E>,
     main_trace_width: usize,

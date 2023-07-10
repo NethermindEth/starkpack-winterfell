@@ -194,7 +194,6 @@ pub trait Prover {
     fn generate_proof<E>(
         &self,
         mut trace: Self::Trace,
-
         mut trace1: Self::Trace,
     ) -> Result<StarkProof, ProverError>
     where
@@ -233,6 +232,8 @@ pub trait Prover {
         // build computation domain; this is used later for polynomial evaluations
         #[cfg(feature = "std")]
         let now = Instant::now();
+        // Keep in mind that here the traces are identitical so only having one domain is fine for
+        // now
         let domain = StarkDomain::new(&air);
         #[cfg(feature = "std")]
         debug!(
@@ -258,6 +259,7 @@ pub trait Prover {
         //I create the clone of the main trace tree
         // manually as the #derive(Clone) didn't work
         let main_trace1_tree = main_trace_tree.clone();
+        //println!("Trace root on Prover Channel:\n{:?}", main_trace_tree.root());
         channel.commit_trace(*main_trace_tree.root());
 
         // initialize trace commitment and trace polynomial table structs with the main trace
@@ -290,6 +292,7 @@ pub trait Prover {
 
             // draw a set of random elements required to build an auxiliary trace segment
             let rand_elements = channel.get_aux_trace_segment_rand_elements(i);
+            println!("The random elements of the Prover,{:?}", rand_elements);
 
             let rand_elements1 = channel.get_aux_trace_segment_rand_elements(i);
             // build the trace segment
@@ -333,6 +336,10 @@ pub trait Prover {
             // so we should clone it too.
             let aux_segment1_tree = aux_segment_tree.clone();
             channel.commit_trace(*aux_segment_tree.root());
+            println!(
+                "The aux Trace root of the Prover,{:?}",
+                aux_segment_tree.root()
+            );
 
             // append the segment to the trace commitment and trace polynomial table structs
             trace_commitment.add_segment(aux_segment_lde, aux_segment_tree);
@@ -403,6 +410,8 @@ pub trait Prover {
         //    final_comb_poly[i] = *val + val1;
         //}
         add_in_place(&mut final_comb_poly, &composition_poly1);
+        assert_eq!(trace_length, trace1_length, "Traces of different lenght");
+        assert_eq!(num_cols, num_cols1, "Traces of different number of columns");
         let final_poly = final_evaluations.into_poly(final_comb_poly, trace_length, num_cols)?;
 
         #[cfg(feature = "std")]
@@ -421,6 +430,10 @@ pub trait Prover {
         let constraint_commitment = self.build_constraint_commitment::<E>(&final_poly, &domain);
         // then, commit to the evaluations of constraints by writing the root of the constraint
         // Merkle tree into the channel
+        //println!(
+        //    "Constraint root on Prover Channel:\n{:?}",
+        //    constraint_commitment.root()
+        //);
         channel.commit_constraints(constraint_commitment.root());
 
         // 4 ----- build DEEP composition polynomial ----------------------------------------------
@@ -440,14 +453,16 @@ pub trait Prover {
         // the verifier. the trace polynomials are actually evaluated over two points: z and z * g,
         // where g is the generator of the trace domain.
         let ood_trace_states = trace_polys.get_ood_frame(z);
-        channel.send_ood_trace_states(&ood_trace_states);
 
         let ood_trace1_states = trace1_polys.get_ood_frame(z);
-        channel.send_ood_trace_states(&ood_trace1_states);
+        channel.send_ood_trace_states(&ood_trace_states, &ood_trace1_states);
+        println!("ood_frame from the prover{:?}", ood_trace_states);
+        println!("ood_frame1 from the prover{:?}", ood_trace1_states);
 
         //let ood_evaluations = composition_poly.evaluate_at(z);
         let ood_evaluations = final_poly.evaluate_at(z);
         channel.send_ood_constraint_evaluations(&ood_evaluations);
+        println!("ood_eval from the prover{:?}", ood_evaluations);
 
         // draw random coefficients to use during DEEP polynomial composition, and use them to
         // initialize the DEEP composition polynomial
@@ -478,7 +493,7 @@ pub trait Prover {
 
         // make sure the degree of the DEEP composition polynomial is equal to trace polynomial
         // degree
-        assert_eq!(domain.trace_length() - 1, deep_composition_poly.degree());
+        assert_eq!(domain.trace_length() - 2, deep_composition_poly.degree());
 
         //let final_poly = deep_composition_poly0 + deep_composition_poly1;
 
@@ -490,7 +505,7 @@ pub trait Prover {
         // we check the following condition in debug mode only because infer_degree is an expensive
         // operation
         debug_assert_eq!(
-            domain.trace_length() - 1,
+            domain.trace_length() - 2,
             infer_degree(&deep_evaluations, domain.offset())
         );
         #[cfg(feature = "std")]
@@ -538,7 +553,7 @@ pub trait Prover {
         // query the execution trace at the selected position; for each query, we need the
         // state of the trace at that position + Merkle authentication path
         let trace_queries = trace_commitment.query(&query_positions);
-
+        //println!("trace_querries from the Prover{:?}", trace_queries);
         let trace1_queries = trace1_commitment.query(&query_positions);
 
         // query the constraint commitment at the selected positions; for each query, we need just

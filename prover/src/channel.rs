@@ -33,6 +33,7 @@ where
     context1: Context,
     commitments: Commitments,
     ood_frame: OodFrame,
+    ood_frame1: OodFrame,
     pow_nonce: u64,
     _field_element: PhantomData<E>,
 }
@@ -65,7 +66,11 @@ where
         let mut coin_seed_elements = context.to_elements();
         coin_seed_elements.append(&mut pub_inputs_elements);
         //My code
-        coin_seed_elements.append(&mut pub_inputs_elements1);
+        //coin_seed_elements.append(&mut pub_inputs_elements1);
+        //println!(
+        //    "Public coin Prover side: Context to elements {:?}",
+        //    coin_seed_elements
+        //);
 
         ProverChannel {
             air,
@@ -75,6 +80,7 @@ where
             context1,
             commitments: Commitments::default(),
             ood_frame: OodFrame::default(),
+            ood_frame1: OodFrame::default(),
             pow_nonce: 0,
             _field_element: PhantomData,
         }
@@ -97,8 +103,9 @@ where
 
     /// Saves the evaluations of trace polynomials over the out-of-domain evaluation frame. This
     /// also reseeds the public coin with the hashes of the evaluation frame states.
-    pub fn send_ood_trace_states(&mut self, trace_states: &[Vec<E>]) {
+    pub fn send_ood_trace_states(&mut self, trace_states: &[Vec<E>], trace_states1: &[Vec<E>]) {
         let result = self.ood_frame.set_trace_states(trace_states);
+        let result1 = self.ood_frame1.set_trace_states(trace_states1);
         self.public_coin.reseed(H::hash_elements(&result));
     }
 
@@ -193,6 +200,7 @@ where
             context: self.context,
             commitments: self.commitments,
             ood_frame: self.ood_frame,
+            ood_frame1: self.ood_frame1,
             trace_queries,
             trace1_queries,
             constraint_queries,

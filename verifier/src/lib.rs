@@ -96,6 +96,7 @@ where
     let mut public_coin_seed = proof.context.to_elements();
     public_coin_seed.append(&mut pub_inputs.to_elements());
     public_coin_seed.append(&mut pub_inputs1.to_elements());
+    //println!("Public coin seed Verifier side: {:?}", public_coin_seed);
     
     // create AIR instance for the computation specified in the proof
     let air = AIR::new(proof.get_trace_info(), pub_inputs, proof.options().clone());
@@ -106,7 +107,20 @@ where
     match air.options().field_extension() {
         FieldExtension::None => {
             let public_coin = RandCoin::new(&public_coin_seed);
+            println!("All alright!");
             let channel = VerifierChannel::new(&air, &air1, proof)?;
+            //let trace_roots = channel.trace_roots.clone();
+            //println!("Trace root on Verifier Channel:\n{:?}", trace_roots);
+            //let constraint_root = channel.constraint_root;//.clone();
+            //println!("constraint root on Verifier Channel:\n{:?}", constraint_root);
+            let ood_state = channel.ood_trace_frame.clone();
+            println!("ood_frame from the Verifier Channel:\n{:?}", ood_state);
+            //let ood_state1 = channel.ood_trace1_frame.clone();
+            //println!("ood_frame1 from the Verifier Channel:\n{:?}", ood_state1);
+            //let ood_evals = channel.ood_constraint_evaluations.clone();
+            //println!("ood_evals from the Verifier Channel:\n{:?}", ood_evals);
+            //let trace_q = channel.trace_queries;//.clone();
+            //println!("trace_querries from the Verifier Channel:\n{:?}", trace_q);
             perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, air1, channel, public_coin)
         },
         FieldExtension::Quadratic => {
@@ -205,7 +219,8 @@ where
     // read the out-of-domain trace frames (the main trace frame and auxiliary trace frame, if
     // provided) sent by the prover and evaluate constraints over them; also, reseed the public
     // coin with the OOD frames received from the prover.
-    let ood_trace_frame = channel.read_ood_trace_frame();
+    let (ood_trace_frame, ood_trace1_frame) = channel.read_ood_trace_frame();
+
     let ood_main_trace_frame = ood_trace_frame.main_frame();
     let ood_aux_trace_frame = ood_trace_frame.aux_frame();
     let ood_constraint_evaluation_1 = evaluate_constraints(
@@ -218,7 +233,6 @@ where
     );
     public_coin.reseed(H::hash_elements(ood_trace_frame.values()));
 
-    let ood_trace1_frame = channel.read_ood_trace_frame();
     let ood_main_trace1_frame = ood_trace1_frame.main_frame();
     let ood_aux_trace1_frame = ood_trace1_frame.aux_frame();
     let ood_constraint_evaluation_1_1 = evaluate_constraints(

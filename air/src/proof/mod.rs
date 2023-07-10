@@ -62,6 +62,7 @@ pub struct StarkProof {
     pub constraint_queries: Queries,
     /// Trace and constraint polynomial evaluations at an out-of-domain point.
     pub ood_frame: OodFrame,
+    pub ood_frame1: OodFrame,
     /// Low-degree proof for a DEEP composition polynomial.
     pub fri_proof: FriProof,
     /// Proof-of-work nonce for query seed grinding.
@@ -138,6 +139,7 @@ impl StarkProof {
         self.trace1_queries.write_into(&mut result);
         self.constraint_queries.write_into(&mut result);
         self.ood_frame.write_into(&mut result);
+        self.ood_frame1.write_into(&mut result);
         self.fri_proof.write_into(&mut result);
         result.extend_from_slice(&self.pow_nonce.to_le_bytes());
         result
@@ -177,6 +179,7 @@ impl StarkProof {
             trace1_queries,
             constraint_queries: Queries::read_from(&mut source)?,
             ood_frame: OodFrame::read_from(&mut source)?,
+            ood_frame1: OodFrame::read_from(&mut source)?,
             fri_proof: FriProof::read_from(&mut source)?,
             pow_nonce: source.read_u64()?,
         };
