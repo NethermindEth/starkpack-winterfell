@@ -456,13 +456,13 @@ pub trait Prover {
 
         let ood_trace1_states = trace1_polys.get_ood_frame(z);
         channel.send_ood_trace_states(&ood_trace_states, &ood_trace1_states);
-        println!("ood_frame from the prover{:?}", ood_trace_states);
-        println!("ood_frame1 from the prover{:?}", ood_trace1_states);
+        //println!("ood_frame from the prover{:?}", ood_trace_states);
+        //println!("ood_frame1 from the prover{:?}", ood_trace1_states);
 
         //let ood_evaluations = composition_poly.evaluate_at(z);
         let ood_evaluations = final_poly.evaluate_at(z);
         channel.send_ood_constraint_evaluations(&ood_evaluations);
-        println!("ood_eval from the prover{:?}", ood_evaluations);
+        //println!("ood_eval from the prover{:?}", ood_evaluations);
 
         // draw random coefficients to use during DEEP polynomial composition, and use them to
         // initialize the DEEP composition polynomial
@@ -548,11 +548,11 @@ pub trait Prover {
 
         // generate FRI proof
         let fri_proof = fri_prover.build_proof(&query_positions);
-
+        //println!("fri_proof from the Prover{:?}", fri_proof);
         // query the execution trace at the selected position; for each query, we need the
         // state of the trace at that position + Merkle authentication path
         let trace_queries = trace_commitment.query(&query_positions);
-        //println!("trace_querries from the Prover{:?}", trace_queries);
+        println!("trace_querries from the Prover{:?}", trace_queries);
         let trace1_queries = trace1_commitment.query(&query_positions);
 
         // query the constraint commitment at the selected positions; for each query, we need just

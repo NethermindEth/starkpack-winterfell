@@ -27,7 +27,7 @@ pub(super) const MAX_PATHS: usize = 255;
 ///
 /// Currently, at most 255 paths can be aggregated into a single proof. This limitation is
 /// imposed primarily for serialization purposes.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct BatchMerkleProof<H: Hasher> {
     /// The leaves being proven
     pub leaves: Vec<H::Digest>,
@@ -35,6 +35,16 @@ pub struct BatchMerkleProof<H: Hasher> {
     pub nodes: Vec<Vec<H::Digest>>,
     /// Depth of the leaves
     pub depth: u8,
+}
+
+impl<H: Hasher> Clone for BatchMerkleProof<H> {
+    fn clone(&self) -> Self {
+        BatchMerkleProof {
+            leaves: self.leaves.clone(),
+            nodes: self.nodes.clone(),
+            depth: self.depth,
+        }
+    }
 }
 
 impl<H: Hasher> BatchMerkleProof<H> {

@@ -87,7 +87,7 @@ pub fn verify<AIR, HashFn, RandCoin>(
 ) -> Result<(), VerifierError> 
 where 
     AIR: Air, 
-    HashFn: ElementHasher<BaseField = AIR::BaseField>,
+    HashFn: ElementHasher<BaseField = AIR::BaseField> + std::fmt::Debug,
     RandCoin: RandomCoin<BaseField = AIR::BaseField, Hasher = HashFn>,
 {
     // build a seed for the public coin; the initial seed is a hash of the proof context and the
@@ -119,8 +119,10 @@ where
             //println!("ood_frame1 from the Verifier Channel:\n{:?}", ood_state1);
             //let ood_evals = channel.ood_constraint_evaluations.clone();
             //println!("ood_evals from the Verifier Channel:\n{:?}", ood_evals);
-            let trace_q = channel.trace_queries;//.clone();
+            let trace_q = channel.trace_queries.clone();
             println!("trace_querries from the Verifier Channel:\n{:?}", trace_q);
+            //let fri_prooof = channel.fri_layer_queries.clone();
+            //println!("fri_proof from the Verifier{:?}", fri_prooof);
             perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, air1, channel, public_coin)
         },
         FieldExtension::Quadratic => {

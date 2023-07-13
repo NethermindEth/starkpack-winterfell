@@ -23,12 +23,12 @@ use utils::{collections::Vec, string::ToString};
 /// well-formed in the context of the computation for the specified [Air].
 pub struct VerifierChannel<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     // trace queries
-    trace_roots: Vec<H::Digest>,
+    pub trace_roots: Vec<H::Digest>,
     pub trace_queries: Option<TraceQueries<E, H>>,
     pub trace1_queries: Option<TraceQueries<E, H>>,
     // constraint queries
-    constraint_root: H::Digest,
-    constraint_queries: Option<ConstraintQueries<E, H>>,
+    pub constraint_root: H::Digest,
+    pub constraint_queries: Option<ConstraintQueries<E, H>>,
     // FRI proof
     pub fri_roots: Option<Vec<H::Digest>>,
     pub fri_layer_proofs: Vec<BatchMerkleProof<H>>,
@@ -258,10 +258,20 @@ where
 ///
 /// Trace states for all auxiliary segments are stored in a single table.
 #[derive(Debug)]
-struct TraceQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
+pub struct TraceQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     query_proofs: Vec<BatchMerkleProof<H>>,
     main_states: Table<E::BaseField>,
     aux_states: Option<Table<E>>,
+}
+
+impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> Clone for TraceQueries<E, H> {
+    fn clone(&self) -> Self {
+        TraceQueries {
+            query_proofs: self.query_proofs.clone(),
+            main_states: self.main_states.clone(),
+            aux_states: self.aux_states.clone(),
+        }
+    }
 }
 
 impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E, H> {
@@ -336,7 +346,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
 /// * Queried constraint evaluation values.
 /// * Merkle authentication paths for all queries.
 #[derive(Debug, Clone)]
-struct ConstraintQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
+pub struct ConstraintQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     query_proofs: BatchMerkleProof<H>,
     evaluations: Table<E>,
 }
