@@ -518,8 +518,9 @@ pub trait Air: Send + Sync {
 
     /// Returns coefficients needed for random linear combinations during construction of DEEP
     /// composition polynomial.
-    fn get_deep_composition_coefficients<E, R>(
+    fn get_deep_composition_coefficients<A: Air, E, R>(
         &self,
+        air1: &A,
         public_coin: &mut R,
     ) -> Result<DeepCompositionCoefficients<E>, RandomCoinError>
     where
@@ -531,6 +532,11 @@ pub trait Air: Send + Sync {
             t_coefficients.push(public_coin.draw()?);
         }
 
+        let mut t1_coefficients = Vec::new();
+        for _ in 0..air1.trace_info().width() {
+            t1_coefficients.push(public_coin.draw()?);
+        }
+
         let mut c_coefficients = Vec::new();
         for _ in 0..self.context().num_constraint_composition_columns() {
             c_coefficients.push(public_coin.draw()?);
@@ -538,6 +544,7 @@ pub trait Air: Send + Sync {
 
         Ok(DeepCompositionCoefficients {
             trace: t_coefficients,
+            trace1: t1_coefficients,
             constraints: c_coefficients,
         })
     }

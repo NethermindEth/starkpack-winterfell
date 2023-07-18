@@ -149,7 +149,7 @@ where
     /// The coefficients are drawn from the public coin uniformly at random.
     pub fn get_deep_composition_coeffs(&mut self) -> DeepCompositionCoefficients<E> {
         self.air
-            .get_deep_composition_coefficients(&mut self.public_coin)
+            .get_deep_composition_coefficients(self.air1, &mut self.public_coin)
             .expect("failed to draw DEEP composition coefficients")
     }
 

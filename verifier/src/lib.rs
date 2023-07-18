@@ -96,7 +96,6 @@ where
     let mut public_coin_seed = proof.context.to_elements();
     public_coin_seed.append(&mut pub_inputs.to_elements());
     public_coin_seed.append(&mut pub_inputs1.to_elements());
-    //println!("Public coin seed Verifier side: {:?}", public_coin_seed);
     
     // create AIR instance for the computation specified in the proof
     let air = AIR::new(proof.get_trace_info(), pub_inputs, proof.options().clone());
@@ -109,20 +108,6 @@ where
             let public_coin = RandCoin::new(&public_coin_seed);
             println!("All alright!");
             let channel = VerifierChannel::new(&air, &air1, proof)?;
-            //let trace_roots = channel.trace_roots.clone();
-            //println!("Trace root on Verifier Channel:\n{:?}", trace_roots);
-            //let constraint_root = channel.constraint_root;//.clone();
-            //println!("constraint root on Verifier Channel:\n{:?}", constraint_root);
-            //let ood_state = channel.ood_trace_frame.clone();
-            //println!("ood_frame from the Verifier Channel:\n{:?}", ood_state);
-            //let ood_state1 = channel.ood_trace1_frame.clone();
-            //println!("ood_frame1 from the Verifier Channel:\n{:?}", ood_state1);
-            //let ood_evals = channel.ood_constraint_evaluations.clone();
-            //println!("ood_evals from the Verifier Channel:\n{:?}", ood_evals);
-            let trace_q = channel.trace_queries.clone();
-            println!("trace_querries from the Verifier Channel:\n{:?}", trace_q);
-            //let fri_prooof = channel.fri_layer_queries.clone();
-            //println!("fri_proof from the Verifier{:?}", fri_prooof);
             perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, air1, channel, public_coin)
         },
         FieldExtension::Quadratic => {
@@ -266,17 +251,21 @@ where
 
     // finally, make sure the values are the same
     if ood_constraint_evaluation_1 + ood_constraint_evaluation_1_1 != ood_constraint_evaluation_2 {
+        println!("Hello");
         return Err(VerifierError::InconsistentOodConstraintEvaluations);
     }
-
     // 4 ----- FRI commitments --------------------------------------------------------------------
     // draw coefficients for computing DEEP composition polynomial from the public coin; in the
     // interactive version of the protocol, the verifier sends these coefficients to the prover
     // and the prover uses them to compute the DEEP composition polynomial. the prover, then
     // applies FRI protocol to the evaluations of the DEEP composition polynomial.
     let deep_coefficients = air
-        .get_deep_composition_coefficients::<E, R>(&mut public_coin)
+        .get_deep_composition_coefficients::<A, E, R>(&air1, &mut public_coin)
         .map_err(|_| VerifierError::RandomCoinError)?;
+    println!(
+        "deep_coeffs root on Verifier Channel:\n{:?}",
+        deep_coefficients
+    );
 
     // instantiates a FRI verifier with the FRI layer commitments read from the channel. From the
     // verifier's perspective, this is equivalent to executing the commit phase of the FRI protocol.

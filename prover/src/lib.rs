@@ -259,7 +259,6 @@ pub trait Prover {
         //I create the clone of the main trace tree
         // manually as the #derive(Clone) didn't work
         let main_trace1_tree = main_trace_tree.clone();
-        //println!("Trace root on Prover Channel:\n{:?}", main_trace_tree.root());
         channel.commit_trace(*main_trace_tree.root());
 
         // initialize trace commitment and trace polynomial table structs with the main trace
@@ -430,10 +429,6 @@ pub trait Prover {
         let constraint_commitment = self.build_constraint_commitment::<E>(&final_poly, &domain);
         // then, commit to the evaluations of constraints by writing the root of the constraint
         // Merkle tree into the channel
-        //println!(
-        //    "Constraint root on Prover Channel:\n{:?}",
-        //    constraint_commitment.root()
-        //);
         channel.commit_constraints(constraint_commitment.root());
 
         // 4 ----- build DEEP composition polynomial ----------------------------------------------
@@ -456,23 +451,26 @@ pub trait Prover {
 
         let ood_trace1_states = trace1_polys.get_ood_frame(z);
         channel.send_ood_trace_states(&ood_trace_states, &ood_trace1_states);
-        //println!("ood_frame from the prover{:?}", ood_trace_states);
-        //println!("ood_frame1 from the prover{:?}", ood_trace1_states);
 
         //let ood_evaluations = composition_poly.evaluate_at(z);
         let ood_evaluations = final_poly.evaluate_at(z);
         channel.send_ood_constraint_evaluations(&ood_evaluations);
-        //println!("ood_eval from the prover{:?}", ood_evaluations);
 
         // draw random coefficients to use during DEEP polynomial composition, and use them to
         // initialize the DEEP composition polynomial
         let deep_coefficients = channel.get_deep_composition_coeffs();
+        println!("deep_coefficients from the prover{:?}", deep_coefficients);
         let mut deep_composition_poly = DeepCompositionPoly::new(z, deep_coefficients);
 
         // combine all trace polynomials together and merge them into the DEEP composition
         // polynomial
-        deep_composition_poly.add_trace_polys(trace_polys, ood_trace_states);
-        deep_composition_poly.add_trace_polys(trace1_polys, ood_trace1_states);
+        deep_composition_poly.add_trace_polys(
+            trace_polys,
+            ood_trace_states,
+            trace1_polys,
+            ood_trace1_states,
+        );
+        //deep_composition_poly.add_trace_polys(trace1_polys, ood_trace1_states);
         // merge columns of constraint composition polynomial into the DEEP composition polynomial;
         deep_composition_poly.add_composition_poly(final_poly, ood_evaluations);
 
@@ -548,24 +546,20 @@ pub trait Prover {
 
         // generate FRI proof
         let fri_proof = fri_prover.build_proof(&query_positions);
-        //println!("fri_proof from the Prover{:?}", fri_proof);
         // query the execution trace at the selected position; for each query, we need the
         // state of the trace at that position + Merkle authentication path
         let trace_queries = trace_commitment.query(&query_positions);
-        println!("trace_querries from the Prover{:?}", trace_queries);
         let trace1_queries = trace1_commitment.query(&query_positions);
 
         // query the constraint commitment at the selected positions; for each query, we need just
         // a Merkle authentication path. this is because constraint evaluations for each step are
         // merged into a single value and Merkle authentication paths contain these values already
         let constraint_queries = constraint_commitment.query(&query_positions);
-
         // build the proof object
         let proof =
             channel.build_proof(trace_queries, trace1_queries, constraint_queries, fri_proof);
         #[cfg(feature = "std")]
         debug!("Built proof object in {} ms", now.elapsed().as_millis());
-
         Ok(proof)
     }
 
