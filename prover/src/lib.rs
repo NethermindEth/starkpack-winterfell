@@ -260,7 +260,8 @@ pub trait Prover {
         // manually as the #derive(Clone) didn't work
         let main_trace1_tree = main_trace_tree.clone();
         channel.commit_trace(*main_trace_tree.root());
-
+        //println!("trace_commit from prover {:?}", *main_trace_tree.root());
+        //println!("channel from prover {:?}", channel);
         // initialize trace commitment and trace polynomial table structs with the main trace
         // data; for multi-segment traces these structs will be used as accumulators of all
         // trace segments
@@ -430,7 +431,6 @@ pub trait Prover {
         // then, commit to the evaluations of constraints by writing the root of the constraint
         // Merkle tree into the channel
         channel.commit_constraints(constraint_commitment.root());
-
         // 4 ----- build DEEP composition polynomial ----------------------------------------------
         #[cfg(feature = "std")]
         let now = Instant::now();
@@ -443,13 +443,13 @@ pub trait Prover {
         // is drawn from, and we can potentially save on performance by only drawing this point
         // from an extension field, rather than increasing the size of the field overall.
         let z = channel.get_ood_point();
-
         // evaluate trace and constraint polynomials at the OOD point z, and send the results to
         // the verifier. the trace polynomials are actually evaluated over two points: z and z * g,
         // where g is the generator of the trace domain.
         let ood_trace_states = trace_polys.get_ood_frame(z);
 
         let ood_trace1_states = trace1_polys.get_ood_frame(z);
+
         channel.send_ood_trace_states(&ood_trace_states, &ood_trace1_states);
 
         //let ood_evaluations = composition_poly.evaluate_at(z);
@@ -459,6 +459,7 @@ pub trait Prover {
         // draw random coefficients to use during DEEP polynomial composition, and use them to
         // initialize the DEEP composition polynomial
         let deep_coefficients = channel.get_deep_composition_coeffs();
+
         println!("deep_coefficients from the prover{:?}", deep_coefficients);
         let mut deep_composition_poly = DeepCompositionPoly::new(z, deep_coefficients);
 

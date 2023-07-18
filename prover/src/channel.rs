@@ -18,7 +18,7 @@ use utils::iterators::*;
 
 // TYPES AND INTERFACES
 // ================================================================================================
-
+#[derive(Debug)]
 pub struct ProverChannel<'a, A, E, H, R>
 where
     A: Air,
@@ -66,11 +66,7 @@ where
         let mut coin_seed_elements = context.to_elements();
         coin_seed_elements.append(&mut pub_inputs_elements);
         //My code
-        //coin_seed_elements.append(&mut pub_inputs_elements1);
-        //println!(
-        //    "Public coin Prover side: Context to elements {:?}",
-        //    coin_seed_elements
-        //);
+        coin_seed_elements.append(&mut pub_inputs_elements1);
 
         ProverChannel {
             air,
@@ -107,6 +103,7 @@ where
         let result = self.ood_frame.set_trace_states(trace_states);
         let result1 = self.ood_frame1.set_trace_states(trace_states1);
         self.public_coin.reseed(H::hash_elements(&result));
+        self.public_coin.reseed(H::hash_elements(&result1));
     }
 
     /// Saves the evaluations of constraint composition polynomial columns at the out-of-domain

@@ -158,7 +158,6 @@ where
 
     // reseed the coin with the commitment to the main trace segment
     public_coin.reseed(trace_commitments[0]);
-
     // process auxiliary trace segments (if any), to build a set of random elements for each segment
     let mut aux_trace_rand_elements = AuxTraceRandElements::<E>::new();
     for (i, commitment) in trace_commitments.iter().skip(1).enumerate() {
@@ -193,12 +192,11 @@ where
     // and sends the results back to the verifier.
     let constraint_commitment = channel.read_constraint_commitment();
     public_coin.reseed(constraint_commitment);
-    let constraint_commitment1 = channel.read_constraint_commitment();
-    public_coin.reseed(constraint_commitment1);
-    let z = public_coin
+    //let constraint_commitment1 = channel.read_constraint_commitment();
+    //public_coin.reseed(constraint_commitment1);
+    let z: E = public_coin
         .draw::<E>()
         .map_err(|_| VerifierError::RandomCoinError)?;
-
     // 3 ----- OOD consistency check --------------------------------------------------------------
     // make sure that evaluations obtained by evaluating constraints over the out-of-domain frame
     // are consistent with the evaluations of composition polynomial columns sent by the prover
@@ -251,7 +249,6 @@ where
 
     // finally, make sure the values are the same
     if ood_constraint_evaluation_1 + ood_constraint_evaluation_1_1 != ood_constraint_evaluation_2 {
-        println!("Hello");
         return Err(VerifierError::InconsistentOodConstraintEvaluations);
     }
     // 4 ----- FRI commitments --------------------------------------------------------------------
