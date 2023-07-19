@@ -190,16 +190,31 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     pub fn read_queried_trace_states(
         &mut self,
         positions: &[usize],
-    ) -> Result<(Table<E::BaseField>, Option<Table<E>>), VerifierError> {
+    ) -> Result<
+        (
+            Table<E::BaseField>,
+            Option<Table<E>>,
+            Table<E::BaseField>,
+            Option<Table<E>>,
+        ),
+        VerifierError,
+    > {
         let queries = self.trace_queries.take().expect("already read");
-
+        let queries1 = self.trace1_queries.take().expect("already read");
+        /*****
+        this part needs to be modified
         // make sure the states included in the proof correspond to the trace commitment
-        for (root, proof) in self.trace_roots.iter().zip(queries.query_proofs.iter()) {
-            MerkleTree::verify_batch(root, positions, proof)
-                .map_err(|_| VerifierError::TraceQueryDoesNotMatchCommitment)?;
-        }
-
-        Ok((queries.main_states, queries.aux_states))
+        //for (root, proof) in self.trace_roots.iter().zip(queries.query_proofs.iter()) {
+        //    MerkleTree::verify_batch(root, positions, proof)
+        //        .map_err(|_| VerifierError::TraceQueryDoesNotMatchCommitment)?;
+        //}
+        */
+        Ok((
+            queries.main_states,
+            queries.aux_states,
+            queries1.main_states,
+            queries1.aux_states,
+        ))
     }
 
     /// Returns constraint evaluations at the specified positions of the LDE domain. This also

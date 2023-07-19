@@ -217,7 +217,7 @@ impl<E: FieldElement> RowMatrix<E> {
                 for (i, row_hash) in batch.iter_mut().enumerate() {
                     let trace_row = self.row(batch_offset + i);
                     let trace1_row = trace1_lde.row(batch_offset + i);
-                    let comb_rows = [trace1_row, trace1_row].concat();
+                    let comb_rows = [trace_row, trace1_row].concat();
                     *row_hash = H::hash_elements(&comb_rows);
                 }
             }

@@ -133,5 +133,6 @@ fn main() {
         DefaultRandomCoin<Blake3_256<BaseElement>>,
     >(proof, pub_inputs, pub_inputs1)
     .is_ok();
+    println!("{:?}", validation);
     assert!(validation)
 }

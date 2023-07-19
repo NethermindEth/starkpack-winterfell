@@ -259,10 +259,6 @@ where
     let deep_coefficients = air
         .get_deep_composition_coefficients::<A, E, R>(&air1, &mut public_coin)
         .map_err(|_| VerifierError::RandomCoinError)?;
-    println!(
-        "deep_coeffs root on Verifier Channel:\n{:?}",
-        deep_coefficients
-    );
 
     // instantiates a FRI verifier with the FRI layer commitments read from the channel. From the
     // verifier's perspective, this is equivalent to executing the commit phase of the FRI protocol.
@@ -298,8 +294,12 @@ where
 
     // read evaluations of trace and constraint composition polynomials at the queried positions;
     // this also checks that the read values are valid against trace and constraint commitments
-    let (queried_main_trace_states, queried_aux_trace_states) =
-        channel.read_queried_trace_states(&query_positions)?;
+    let (
+        queried_main_trace_states,
+        queried_aux_trace_states,
+        queried_main_trace1_states,
+        queried_aux_trace1_states,
+    ) = channel.read_queried_trace_states(&query_positions)?;
     let queried_constraint_evaluations = channel.read_constraint_evaluations(&query_positions)?;
 
     // 6 ----- DEEP composition -------------------------------------------------------------------
@@ -310,11 +310,14 @@ where
         queried_aux_trace_states,
         ood_main_trace_frame,
         ood_aux_trace_frame,
+        queried_main_trace1_states,
+        queried_aux_trace1_states,
+        ood_main_trace1_frame,
+        ood_aux_trace1_frame,
     );
     let c_composition = composer
         .compose_constraint_evaluations(queried_constraint_evaluations, ood_constraint_evaluations);
     let deep_evaluations = composer.combine_compositions(t_composition, c_composition);
-
     // 7 ----- Verify low-degree proof -------------------------------------------------------------
     // make sure that evaluations of the DEEP composition polynomial we computed in the previous
     // step are in fact evaluations of a polynomial of degree equal to trace polynomial degree
