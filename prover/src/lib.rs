@@ -260,8 +260,6 @@ pub trait Prover {
         // manually as the #derive(Clone) didn't work
         let main_trace1_tree = main_trace_tree.clone();
         channel.commit_trace(*main_trace_tree.root());
-        //println!("trace_commit from prover {:?}", *main_trace_tree.root());
-        //println!("channel from prover {:?}", channel);
         // initialize trace commitment and trace polynomial table structs with the main trace
         // data; for multi-segment traces these structs will be used as accumulators of all
         // trace segments
@@ -359,7 +357,6 @@ pub trait Prover {
         // mode only because this is a very expensive operation.
         #[cfg(debug_assertions)]
         trace.validate(&air, &aux_trace_segments, &aux_trace_rand_elements);
-
         trace1.validate(&air1, &aux_trace1_segments, &aux_trace1_rand_elements);
 
         // 2 ----- evaluate constraints -----------------------------------------------------------
@@ -607,10 +604,9 @@ pub trait Prover {
         );
 
         // build trace commitment
-        let trace1_lde_clone = trace1_lde.clone();
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let trace_tree = trace_lde.commit_to_comb_rows(trace1_lde_clone);
+        let trace_tree = trace_lde.commit_to_comb_rows(trace1_lde.clone());
 
         #[cfg(feature = "std")]
         debug!(

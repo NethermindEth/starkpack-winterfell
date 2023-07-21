@@ -106,7 +106,6 @@ where
     match air.options().field_extension() {
         FieldExtension::None => {
             let public_coin = RandCoin::new(&public_coin_seed);
-            println!("All alright!");
             let channel = VerifierChannel::new(&air, &air1, proof)?;
             perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, air1, channel, public_coin)
         },
