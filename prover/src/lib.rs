@@ -256,23 +256,19 @@ pub trait Prover {
         // Here we may need to commit to all the traces
         // probably there will be some problems on how the channel sends this to the verifier
 
-        //I create the clone of the main trace tree
+        //I created the clone of the main trace tree
         // manually as the #derive(Clone) didn't work
-        let main_trace1_tree = main_trace_tree.clone();
+        //let main_trace1_tree = main_trace_tree.clone();
         channel.commit_trace(*main_trace_tree.root());
         // initialize trace commitment and trace polynomial table structs with the main trace
         // data; for multi-segment traces these structs will be used as accumulators of all
         // trace segments
 
-        //let main_trace1_tree = &main_trace_tree;
         let mut trace_commitment = TraceCommitment::new(
             main_trace_lde,
+            main_trace1_lde,
             main_trace_tree,
             domain.trace_to_lde_blowup(),
-        );
-        let mut trace1_commitment = TraceCommitment::new(
-            main_trace1_lde,
-            main_trace1_tree,
             domain.trace_to_lde_blowup(),
         );
         let mut trace_polys = TracePolyTable::new(main_trace_polys);
@@ -332,7 +328,7 @@ pub trait Prover {
 
             //The aux_tree is also one for all of the trace
             // so we should clone it too.
-            let aux_segment1_tree = aux_segment_tree.clone();
+            //let aux_segment1_tree = aux_segment_tree.clone();
             channel.commit_trace(*aux_segment_tree.root());
             println!(
                 "The aux Trace root of the Prover,{:?}",
@@ -341,7 +337,7 @@ pub trait Prover {
 
             // append the segment to the trace commitment and trace polynomial table structs
             trace_commitment.add_segment(aux_segment_lde, aux_segment_tree);
-            trace1_commitment.add_segment(aux_segment1_lde, aux_segment1_tree);
+            //trace_commitment.add_segment(aux_segment1_lde, aux_segment_tree);
 
             trace_polys.add_aux_segment(aux_segment_polys);
             aux_trace_rand_elements.add_segment_elements(rand_elements);
@@ -375,7 +371,7 @@ pub trait Prover {
         let constraint_coeffs1 = channel.get_constraint_composition_coeffs();
         let evaluator1 =
             ConstraintEvaluator::new(&air1, aux_trace1_rand_elements, constraint_coeffs1);
-        let constraint_evaluations1 = evaluator1.evaluate(trace1_commitment.trace_table(), &domain);
+        let constraint_evaluations1 = evaluator1.evaluate(trace_commitment.trace1_table(), &domain);
 
         // We need to combine all comp polys into one final polynomial.
         let final_evaluations = constraint_evaluations.clone();
@@ -546,15 +542,13 @@ pub trait Prover {
         // query the execution trace at the selected position; for each query, we need the
         // state of the trace at that position + Merkle authentication path
         let trace_queries = trace_commitment.query(&query_positions);
-        let trace1_queries = trace1_commitment.query(&query_positions);
-
+        //let trace1_queries = trace1_commitment.query(&query_positions);
         // query the constraint commitment at the selected positions; for each query, we need just
         // a Merkle authentication path. this is because constraint evaluations for each step are
         // merged into a single value and Merkle authentication paths contain these values already
         let constraint_queries = constraint_commitment.query(&query_positions);
         // build the proof object
-        let proof =
-            channel.build_proof(trace_queries, trace1_queries, constraint_queries, fri_proof);
+        let proof = channel.build_proof(trace_queries, constraint_queries, fri_proof);
         #[cfg(feature = "std")]
         debug!("Built proof object in {} ms", now.elapsed().as_millis());
         Ok(proof)

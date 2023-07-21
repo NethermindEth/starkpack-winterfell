@@ -107,6 +107,7 @@ where
         FieldExtension::None => {
             let public_coin = RandCoin::new(&public_coin_seed);
             let channel = VerifierChannel::new(&air, &air1, proof)?;
+            println!("Trace_queiries from verifier{:?}", channel.trace_queries);
             perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, air1, channel, public_coin)
         },
         FieldExtension::Quadratic => {
@@ -293,12 +294,8 @@ where
 
     // read evaluations of trace and constraint composition polynomials at the queried positions;
     // this also checks that the read values are valid against trace and constraint commitments
-    let (
-        queried_main_trace_states,
-        queried_aux_trace_states,
-        queried_main_trace1_states,
-        queried_aux_trace1_states,
-    ) = channel.read_queried_trace_states(&query_positions)?;
+    let (queried_main_trace_states, queried_aux_trace_states, queried_main_trace1_states) =
+        channel.read_queried_trace_states(&query_positions)?;
     let queried_constraint_evaluations = channel.read_constraint_evaluations(&query_positions)?;
 
     // 6 ----- DEEP composition -------------------------------------------------------------------
@@ -310,7 +307,6 @@ where
         ood_main_trace_frame,
         ood_aux_trace_frame,
         queried_main_trace1_states,
-        queried_aux_trace1_states,
         ood_main_trace1_frame,
         ood_aux_trace1_frame,
     );

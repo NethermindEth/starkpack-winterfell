@@ -4,7 +4,7 @@
 // LICENSE file in the root directory of this source tree.
 
 use air::{
-    proof::{Commitments, Context, OodFrame, Queries, StarkProof},
+    proof::{Commitments, Context, JointTraceQueries, OodFrame, Queries, StarkProof},
     Air, ConstraintCompositionCoefficients, DeepCompositionCoefficients,
 };
 use core::marker::PhantomData;
@@ -189,8 +189,7 @@ where
     /// this method.
     pub fn build_proof(
         self,
-        trace_queries: Vec<Queries>,
-        trace1_queries: Vec<Queries>,
+        trace_queries: Vec<JointTraceQueries>,
         constraint_queries: Queries,
         fri_proof: FriProof,
     ) -> StarkProof {
@@ -200,7 +199,6 @@ where
             ood_frame: self.ood_frame,
             ood_frame1: self.ood_frame1,
             trace_queries,
-            trace1_queries,
             constraint_queries,
             fri_proof,
             pow_nonce: self.pow_nonce,

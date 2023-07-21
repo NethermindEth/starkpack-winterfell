@@ -59,7 +59,6 @@ impl<E: FieldElement> DeepComposer<E> {
         ood_main_frame: EvaluationFrame<E>,
         ood_aux_frame: Option<EvaluationFrame<E>>,
         queried_main_trace1_states: Table<E::BaseField>,
-        queried_aux_trace1_states: Option<Table<E>>,
         ood_main1_frame: EvaluationFrame<E>,
         ood_aux1_frame: Option<EvaluationFrame<E>>,
     ) -> Vec<E> {
@@ -170,7 +169,7 @@ impl<E: FieldElement> DeepComposer<E> {
 
         // if the trace has auxiliary segments, compose columns from these segments as well; we
         // also do this separately for numerators and denominators.
-        if let Some(queried_aux_trace1_states) = queried_aux_trace1_states {
+        /*if let Some(queried_aux_trace1_states) = queried_aux_trace1_states {
             let ood_aux1_frame = ood_aux1_frame.expect("missing auxiliary OOD frame");
             let ood_aux_trace1_states = [ood_aux1_frame.current(), ood_aux1_frame.next()];
 
@@ -200,7 +199,7 @@ impl<E: FieldElement> DeepComposer<E> {
                 let t2_den = x - self.z[1];
                 result1_num[j] += t1_num * t2_den + t2_num * t1_den;
             }
-        }
+        }*/
         let mut final_num = result_num;
         add_in_place(&mut final_num, &result1_num);
         result_den = batch_inversion(&result_den);

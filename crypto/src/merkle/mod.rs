@@ -89,14 +89,14 @@ pub struct MerkleTree<H: Hasher> {
     leaves: Vec<H::Digest>,
 }
 
-impl<H: Hasher> Clone for MerkleTree<H> {
+/*impl<H: Hasher> Clone for MerkleTree<H> {
     fn clone(&self) -> Self {
         MerkleTree {
             nodes: self.nodes.clone(),
             leaves: self.leaves.clone(),
         }
     }
-}
+}*/
 
 // MERKLE TREE IMPLEMENTATION
 // ================================================================================================

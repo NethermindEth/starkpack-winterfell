@@ -3,13 +3,12 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+use super::TraceLde;
 use crate::RowMatrix;
-use air::proof::Queries;
+use air::proof::JointTraceQueries;
 use crypto::{ElementHasher, MerkleTree};
 use math::FieldElement;
 use utils::collections::Vec;
-
-use super::TraceLde;
 
 // TRACE COMMITMENT
 // ================================================================================================
@@ -21,7 +20,9 @@ use super::TraceLde;
 /// * Merkle tree where each leaf in the tree corresponds to a row in the trace LDE matrix.
 pub struct TraceCommitment<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     trace_lde: TraceLde<E>,
+    trace1_lde: TraceLde<E>,
     main_segment_tree: MerkleTree<H>,
+    //We most probably need just one aux_tree
     aux_segment_trees: Vec<MerkleTree<H>>,
 }
 
@@ -32,16 +33,24 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
     /// corresponding Merkle tree commitment.
     pub fn new(
         main_trace_lde: RowMatrix<E::BaseField>,
+        main_trace1_lde: RowMatrix<E::BaseField>,
         main_trace_tree: MerkleTree<H>,
         blowup: usize,
+        blowup1: usize,
     ) -> Self {
         assert_eq!(
             main_trace_lde.num_rows(),
             main_trace_tree.leaves().len(),
             "number of rows in trace LDE must be the same as number of leaves in trace commitment"
         );
+        assert_eq!(
+            main_trace1_lde.num_rows(),
+            main_trace_tree.leaves().len(),
+            "number of rows in trace LDE must be the same as number of leaves in trace commitment"
+        );
         Self {
             trace_lde: TraceLde::new(main_trace_lde, blowup),
+            trace1_lde: TraceLde::new(main_trace1_lde, blowup1),
             main_segment_tree: main_trace_tree,
             aux_segment_trees: Vec::new(),
         }
@@ -71,15 +80,19 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
     pub fn trace_table(&self) -> &TraceLde<E> {
         &self.trace_lde
     }
+    pub fn trace1_table(&self) -> &TraceLde<E> {
+        &self.trace1_lde
+    }
 
     // QUERY TRACE
     // --------------------------------------------------------------------------------------------
     /// Returns trace table rows at the specified positions along with Merkle authentication paths
     /// from the commitment root to these rows.
-    pub fn query(&self, positions: &[usize]) -> Vec<Queries> {
+    pub fn query(&self, positions: &[usize]) -> Vec<JointTraceQueries> {
         // build queries for the main trace segment
         let mut result = vec![build_segment_queries(
             self.trace_lde.get_main_segment(),
+            self.trace1_lde.get_main_segment(),
             &self.main_segment_tree,
             positions,
         )];
@@ -87,7 +100,13 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
         // build queries for auxiliary trace segments
         for (i, segment_tree) in self.aux_segment_trees.iter().enumerate() {
             let segment_lde = self.trace_lde.get_aux_segment(i);
-            result.push(build_segment_queries(segment_lde, segment_tree, positions));
+            let segment1_lde = self.trace1_lde.get_aux_segment(i);
+            result.push(build_segment_queries(
+                segment_lde,
+                segment1_lde,
+                segment_tree,
+                positions,
+            ));
         }
 
         result
@@ -117,9 +136,10 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
 
 fn build_segment_queries<E, H>(
     segment_lde: &RowMatrix<E>,
+    segment1_lde: &RowMatrix<E>,
     segment_tree: &MerkleTree<H>,
     positions: &[usize],
-) -> Queries
+) -> JointTraceQueries
 where
     E: FieldElement,
     H: ElementHasher<BaseField = E::BaseField>,
@@ -130,11 +150,19 @@ where
         .iter()
         .map(|&pos| segment_lde.row(pos).to_vec())
         .collect::<Vec<_>>();
-
+    let trace1_states = positions
+        .iter()
+        .map(|&pos| segment1_lde.row(pos).to_vec())
+        .collect::<Vec<_>>();
+    let comb_states = trace_states
+        .iter()
+        .zip(trace1_states.iter())
+        .map(|(&ref row, &ref row1)| [row, row1].concat())
+        .collect::<Vec<_>>();
     // build Merkle authentication paths to the leaves specified by positions
     let trace_proof = segment_tree
         .prove_batch(positions)
         .expect("failed to generate a Merkle proof for trace queries");
 
-    Queries::new(trace_proof, trace_states)
+    JointTraceQueries::new(trace_proof, comb_states, trace_states, trace1_states)
 }

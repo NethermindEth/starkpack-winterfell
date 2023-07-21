@@ -5,7 +5,7 @@
 
 use crate::VerifierError;
 use air::{
-    proof::{Queries, StarkProof, Table},
+    proof::{JointTraceQueries, Queries, StarkProof, Table},
     Air, EvaluationFrame,
 };
 use crypto::{BatchMerkleProof, ElementHasher, MerkleTree};
@@ -25,7 +25,6 @@ pub struct VerifierChannel<E: FieldElement, H: ElementHasher<BaseField = E::Base
     // trace queries
     pub trace_roots: Vec<H::Digest>,
     pub trace_queries: Option<TraceQueries<E, H>>,
-    pub trace1_queries: Option<TraceQueries<E, H>>,
     // constraint queries
     pub constraint_root: H::Digest,
     pub constraint_queries: Option<ConstraintQueries<E, H>>,
@@ -56,7 +55,6 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             context,
             commitments,
             trace_queries,
-            trace1_queries,
             constraint_queries,
             ood_frame,
             ood_frame1,
@@ -91,8 +89,8 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
 
         // --- parse trace and constraint queries -------------------------------------------------
-        let trace_queries = TraceQueries::new(trace_queries, air)?;
-        let trace1_queries = TraceQueries::new(trace1_queries, air1)?;
+        let trace_queries = TraceQueries::new(trace_queries, air, air1)?;
+        //println!("Trace_queiries from verifier{:?}", trace_queries);
         let constraint_queries = ConstraintQueries::new(constraint_queries, air)?;
 
         // --- parse FRI proofs -------------------------------------------------------------------
@@ -121,7 +119,6 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             // trace queries
             trace_roots,
             trace_queries: Some(trace_queries),
-            trace1_queries: Some(trace1_queries),
             // constraint queries
             constraint_root,
             constraint_queries: Some(constraint_queries),
@@ -190,30 +187,20 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     pub fn read_queried_trace_states(
         &mut self,
         positions: &[usize],
-    ) -> Result<
-        (
-            Table<E::BaseField>,
-            Option<Table<E>>,
-            Table<E::BaseField>,
-            Option<Table<E>>,
-        ),
-        VerifierError,
-    > {
+    ) -> Result<(Table<E::BaseField>, Option<Table<E>>, Table<E::BaseField>), VerifierError> {
         let queries = self.trace_queries.take().expect("already read");
-        let queries1 = self.trace1_queries.take().expect("already read");
-        /*****
-        this part needs to be modified
+        //*****
+        //MerkleTree check needs to be modified
         // make sure the states included in the proof correspond to the trace commitment
-        //for (root, proof) in self.trace_roots.iter().zip(queries.query_proofs.iter()) {
-        //    MerkleTree::verify_batch(root, positions, proof)
-        //        .map_err(|_| VerifierError::TraceQueryDoesNotMatchCommitment)?;
-        //}
-        */
+        for (root, proof) in self.trace_roots.iter().zip(queries.query_proofs.iter()) {
+            MerkleTree::verify_batch(root, positions, proof)
+                .map_err(|_| VerifierError::TraceQueryDoesNotMatchCommitment)?;
+        }
+        //*/
         Ok((
             queries.main_states,
             queries.aux_states,
-            queries1.main_states,
-            queries1.aux_states,
+            queries.main1_states,
         ))
     }
 
@@ -275,7 +262,9 @@ where
 #[derive(Debug)]
 pub struct TraceQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     query_proofs: Vec<BatchMerkleProof<H>>,
+    comb_states: Table<E::BaseField>,
     main_states: Table<E::BaseField>,
+    main1_states: Table<E::BaseField>,
     aux_states: Option<Table<E>>,
 }
 
@@ -283,7 +272,9 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> Clone for Trac
     fn clone(&self) -> Self {
         TraceQueries {
             query_proofs: self.query_proofs.clone(),
+            comb_states: self.comb_states.clone(),
             main_states: self.main_states.clone(),
+            main1_states: self.main1_states.clone(),
             aux_states: self.aux_states.clone(),
         }
     }
@@ -293,8 +284,9 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
     /// Parses the provided trace queries into trace states in the specified field and
     /// corresponding Merkle authentication paths.
     pub fn new<A: Air<BaseField = E::BaseField>>(
-        mut queries: Vec<Queries>,
+        mut queries: Vec<JointTraceQueries>,
         air: &A,
+        air1: &A,
     ) -> Result<Self, VerifierError> {
         assert_eq!(
             queries.len(),
@@ -303,15 +295,34 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
             air.trace_layout().num_segments(),
             queries.len()
         );
+        assert_eq!(
+            queries.len(),
+            air1.trace_layout().num_segments(),
+            "expected {} trace segment queries, but received {}",
+            air1.trace_layout().num_segments(),
+            queries.len()
+        );
 
+        /////
         let num_queries = air.options().num_queries();
 
         // parse main trace segment queries; parsing also validates that hashes of each table row
         // form the leaves of Merkle authentication paths in the proofs
         let main_segment_width = air.trace_layout().main_trace_width();
+        let main_segment1_width = air1.trace_layout().main_trace_width();
         let main_segment_queries = queries.remove(0);
-        let (main_segment_query_proofs, main_segment_states) = main_segment_queries
-            .parse::<H, E::BaseField>(air.lde_domain_size(), num_queries, main_segment_width)
+        let (
+            main_segment_query_proofs,
+            comb_segment_states,
+            main_segment_states,
+            main_segment1_states,
+        ) = main_segment_queries
+            .parse::<H, E::BaseField>(
+                air.lde_domain_size(),
+                num_queries,
+                main_segment_width,
+                main_segment1_width,
+            )
             .map_err(|err| {
                 VerifierError::ProofDeserializationError(format!(
                     "main trace segment query deserialization failed: {err}"
@@ -320,7 +331,6 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
 
         // all query proofs will be aggregated into a single vector
         let mut query_proofs = vec![main_segment_query_proofs];
-
         // parse auxiliary trace segment queries (if any), and merge resulting tables into a
         // single table; parsing also validates that hashes of each table row form the leaves
         // of Merkle authentication paths in the proofs
@@ -328,8 +338,19 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
             let mut aux_trace_states = Vec::new();
             for (i, segment_queries) in queries.into_iter().enumerate() {
                 let segment_width = air.trace_layout().get_aux_segment_width(i);
-                let (segment_query_proof, segment_trace_states) = segment_queries
-                    .parse::<H, E>(air.lde_domain_size(), num_queries, segment_width)
+                let segment1_width = air1.trace_layout().get_aux_segment_width(i);
+                let (
+                    segment_query_proof,
+                    aux_comb_trace_states,
+                    segment_trace_states,
+                    segment_trace1_states,
+                ) = segment_queries
+                    .parse::<H, E>(
+                        air.lde_domain_size(),
+                        num_queries,
+                        segment_width,
+                        segment1_width,
+                    )
                     .map_err(|err| {
                         VerifierError::ProofDeserializationError(format!(
                             "auxiliary trace segment query deserialization failed: {err}"
@@ -348,7 +369,9 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
 
         Ok(Self {
             query_proofs,
+            comb_states: comb_segment_states,
             main_states: main_segment_states,
+            main1_states: main_segment1_states,
             aux_states: aux_trace_states,
         })
     }

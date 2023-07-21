@@ -20,6 +20,7 @@ mod commitments;
 pub use commitments::Commitments;
 
 mod queries;
+pub use queries::JointTraceQueries;
 pub use queries::Queries;
 
 mod ood_frame;
@@ -55,8 +56,7 @@ pub struct StarkProof {
     pub commitments: Commitments,
     /// Decommitments of extended execution trace values (for all trace segments) at position
     ///  queried by the verifier.
-    pub trace_queries: Vec<Queries>,
-    pub trace1_queries: Vec<Queries>,
+    pub trace_queries: Vec<JointTraceQueries>,
     /// Decommitments of constraint composition polynomial evaluations at positions queried by
     /// the verifier.
     pub constraint_queries: Queries,
@@ -136,7 +136,6 @@ impl StarkProof {
         self.context.write_into(&mut result);
         self.commitments.write_into(&mut result);
         self.trace_queries.write_into(&mut result);
-        self.trace1_queries.write_into(&mut result);
         self.constraint_queries.write_into(&mut result);
         self.ood_frame.write_into(&mut result);
         self.ood_frame1.write_into(&mut result);
@@ -160,15 +159,10 @@ impl StarkProof {
 
         // parse trace queries
         let num_trace_segments = context.trace_layout().num_segments();
+        //We may need to change something here!!
         let mut trace_queries = Vec::with_capacity(num_trace_segments);
         for _ in 0..num_trace_segments {
-            trace_queries.push(Queries::read_from(&mut source)?);
-        }
-
-        let num_trace1_segments = context.trace_layout().num_segments();
-        let mut trace1_queries = Vec::with_capacity(num_trace1_segments);
-        for _ in 0..num_trace1_segments {
-            trace1_queries.push(Queries::read_from(&mut source)?);
+            trace_queries.push(JointTraceQueries::read_from(&mut source)?);
         }
 
         // parse the rest of the proof
@@ -176,7 +170,6 @@ impl StarkProof {
             context,
             commitments,
             trace_queries,
-            trace1_queries,
             constraint_queries: Queries::read_from(&mut source)?,
             ood_frame: OodFrame::read_from(&mut source)?,
             ood_frame1: OodFrame::read_from(&mut source)?,
