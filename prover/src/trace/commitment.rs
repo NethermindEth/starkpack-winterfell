@@ -154,11 +154,17 @@ where
         .iter()
         .map(|&pos| segment1_lde.row(pos).to_vec())
         .collect::<Vec<_>>();
-    let comb_states = trace_states
-        .iter()
-        .zip(trace1_states.iter())
-        .map(|(&ref row, &ref row1)| [row, row1].concat())
-        .collect::<Vec<_>>();
+    /*let comb_states = trace_states
+    .iter()
+    .zip(trace1_states.iter())
+    .map(|(&ref row, &ref row1)| [row, row1].concat())
+    .collect::<Vec<_>>();*/
+    let mut comb_states = Vec::with_capacity(trace_states.len());
+    for (i, row) in trace_states.iter().enumerate() {
+        let trace_row = &row[..];
+        let trace1_row = &trace1_states[i][..];
+        comb_states.push([trace_row, trace1_row].concat());
+    }
     // build Merkle authentication paths to the leaves specified by positions
     let trace_proof = segment_tree
         .prove_batch(positions)

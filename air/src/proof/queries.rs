@@ -235,7 +235,7 @@ impl JointTraceQueries {
         for elements in query_value.iter() {
             assert_eq!(
                 elements.len(),
-                elements_per_query,
+                elements_per_query_value,
                 "all queries must contain the same number of evaluations"
             );
             value.write(elements);
@@ -245,7 +245,7 @@ impl JointTraceQueries {
         for elements in query_value1.iter() {
             assert_eq!(
                 elements.len(),
-                elements_per_query,
+                elements_per_query_value1,
                 "all queries must contain the same number of evaluations"
             );
             value1.write(elements);
