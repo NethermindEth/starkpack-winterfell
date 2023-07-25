@@ -26,11 +26,9 @@ where
     H: ElementHasher<BaseField = A::BaseField>,
     R: RandomCoin<BaseField = E::BaseField, Hasher = H>,
 {
-    air: &'a A,
-    air1: &'a A,
+    airs: &'a Vec<A>,
     public_coin: R,
-    context: Context,
-    context1: Context,
+    contexts: Vec<Context>,
     commitments: Commitments,
     ood_frame: OodFrame,
     ood_frame1: OodFrame,
@@ -51,29 +49,23 @@ where
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     /// Creates a new prover channel for the specified `air` and public inputs.
-    pub fn new(
-        air: &'a A,
-        air1: &'a A,
-        mut pub_inputs_elements: Vec<A::BaseField>,
-        mut pub_inputs_elements1: Vec<A::BaseField>,
-    ) -> Self {
-        let context = Context::new::<A::BaseField>(air.trace_info(), air.options().clone());
-        let context1 = Context::new::<A::BaseField>(air1.trace_info(), air1.options().clone());
+    pub fn new(airs: &'a Vec<A>, mut pub_inputs_elements_vec: Vec<Vec<A::BaseField>>) -> Self {
+        let contexts: Vec<Context> = airs
+            .iter()
+            .map(|air| Context::new::<A::BaseField>(air.trace_info(), air.options().clone()))
+            .collect();
 
         // build a seed for the public coin; the initial seed is a hash of the proof context and
         // the public inputs, but as the protocol progresses, the coin will be reseeded with the
         // info sent to the verifier
-        let mut coin_seed_elements = context.to_elements();
-        coin_seed_elements.append(&mut pub_inputs_elements);
-        //My code
-        coin_seed_elements.append(&mut pub_inputs_elements1);
-
+        let mut coin_seed_elements = contexts[0].to_elements();
+        for mut pub_inputs_elements in pub_inputs_elements_vec {
+            coin_seed_elements.append(&mut pub_inputs_elements);
+        }
         ProverChannel {
-            air,
-            air1,
+            airs,
             public_coin: RandomCoin::new(&coin_seed_elements),
-            context,
-            context1,
+            contexts,
             commitments: Commitments::default(),
             ood_frame: OodFrame::default(),
             ood_frame1: OodFrame::default(),

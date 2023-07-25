@@ -102,12 +102,15 @@ fn main() {
 
     let start = BaseElement::new(3);
     let start1 = BaseElement::new(4);
+    let starting_vec = (3..4).map(|i| BaseElement::new(i));
     let n = 1024;
     // Build the execution trace and get the result from the last step.
     let trace = build_do_work_trace(start, n);
     let trace1 = build_do_work_trace(start1, n);
+    let traces = starting_vec.map(|start| build_do_work_trace(start, n));
     let result = trace.get(0, n - 1);
     let result1 = trace1.get(0, n - 1);
+    let results = traces.map(|trace| trace.get(0, n - 1));
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(
         32, // number of queries
@@ -119,7 +122,7 @@ fn main() {
     );
     // Instantiate the prover and generate the proof.
     let prover = WorkProver::new(options);
-    let proof = prover.prove(trace, trace1).unwrap();
+    let proof = prover.prove(traces);
     // Verify the proof. The number of steps and options are encoded in the proof itself,
     // so we don't need to pass them explicitly to the verifier.
     let pub_inputs = PublicInputs { start, result };
@@ -127,10 +130,14 @@ fn main() {
         start: start1,
         result: result1,
     };
-    match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(proof, pub_inputs, pub_inputs1) {
+    match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
+        proof,
+        pub_inputs,
+        pub_inputs1,
+    ) {
         Ok(validation) => {
             println!("Proof is valid");
-        },
+        }
         Err(err) => {
             println!("Proof is not valid\nErr: {}", err);
         }

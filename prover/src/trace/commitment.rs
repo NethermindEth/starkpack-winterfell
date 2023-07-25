@@ -19,8 +19,7 @@ use utils::collections::Vec;
 /// * Evaluations of a trace segment's polynomials over the LDE domain.
 /// * Merkle tree where each leaf in the tree corresponds to a row in the trace LDE matrix.
 pub struct TraceCommitment<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
-    trace_lde: TraceLde<E>,
-    trace1_lde: TraceLde<E>,
+    traces_lde: Vec<TraceLde<E>>,
     main_segment_tree: MerkleTree<H>,
     //We most probably need just one aux_tree
     aux_segment_trees: Vec<MerkleTree<H>>,
@@ -32,25 +31,16 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
     /// Creates a new trace commitment from the provided main trace low-degree extension and the
     /// corresponding Merkle tree commitment.
     pub fn new(
-        main_trace_lde: RowMatrix<E::BaseField>,
-        main_trace1_lde: RowMatrix<E::BaseField>,
+        main_traces_lde: Vec<RowMatrix<E::BaseField>>,
         main_trace_tree: MerkleTree<H>,
-        blowup: usize,
-        blowup1: usize,
+        blowups: Vec<usize>,
     ) -> Self {
-        assert_eq!(
-            main_trace_lde.num_rows(),
-            main_trace_tree.leaves().len(),
-            "number of rows in trace LDE must be the same as number of leaves in trace commitment"
-        );
-        assert_eq!(
-            main_trace1_lde.num_rows(),
-            main_trace_tree.leaves().len(),
-            "number of rows in trace LDE must be the same as number of leaves in trace commitment"
-        );
+        let mut num_rows_for_traces = main_traces_lde.iter().map(|main_trace_lde| main_trace_lde.num_rows());
+        let main_tree_leaves_lenght = main_trace_tree.leaves().len();
+        assert!(num_rows_for_traces.all(|num_rows| num_rows == main_tree_leaves_lenght), "number of rows in trace LDE must be the same as number of leaves in trace commitment");
+        let traces_lde = main_traces_lde.iter().zip(blowups).map(|(&main_trace_lde, blowup)| TraceLde::new(main_trace_lde, blowup)).collect();
         Self {
-            trace_lde: TraceLde::new(main_trace_lde, blowup),
-            trace1_lde: TraceLde::new(main_trace1_lde, blowup1),
+            traces_lde,
             main_segment_tree: main_trace_tree,
             aux_segment_trees: Vec::new(),
         }

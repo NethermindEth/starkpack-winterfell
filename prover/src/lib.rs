@@ -164,22 +164,22 @@ pub trait Prover {
     /// secret and public inputs. Public inputs must match the value returned from
     /// [Self::get_pub_inputs()](Prover::get_pub_inputs) for the provided trace.
     #[rustfmt::skip]
-    fn prove(&self, trace: Self::Trace, trace1: Self::Trace) -> Result<StarkProof, ProverError> {
+    fn prove(&self, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
         // figure out which version of the generic proof generation procedure to run. this is a sort
         // of static dispatch for selecting two generic parameter: extension field and hash function.
         match self.options().field_extension() {
-            FieldExtension::None => self.generate_proof::<Self::BaseField>(trace, trace1),
+            FieldExtension::None => self.generate_proof::<Self::BaseField>(traces),
             FieldExtension::Quadratic => {
                 if !<QuadExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(2));
                 }
-                self.generate_proof::<QuadExtension<Self::BaseField>>(trace, trace1)
+                self.generate_proof::<QuadExtension<Self::BaseField>>(traces)
             }
             FieldExtension::Cubic => {
                 if !<CubeExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(3));
                 }
-                self.generate_proof::<CubeExtension<Self::BaseField>>(trace, trace1)
+                self.generate_proof::<QuadExtension<Self::BaseField>>(traces)
             }
         }
     }
@@ -191,38 +191,35 @@ pub trait Prover {
     /// execution `trace` is valid against this prover's AIR.
     /// TODO: make this function un-callable externally?
     #[doc(hidden)]
-    fn generate_proof<E>(
-        &self,
-        mut trace: Self::Trace,
-        mut trace1: Self::Trace,
-    ) -> Result<StarkProof, ProverError>
+    fn generate_proof<E>(&self, mut traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError>
     where
         E: FieldElement<BaseField = Self::BaseField>,
     {
         // 0 ----- instantiate AIR and prover channel ---------------------------------------------
 
         // serialize public inputs; these will be included in the seed for the public coin
-        let pub_inputs = self.get_pub_inputs(&trace);
-        let pub_inputs_elements = pub_inputs.to_elements();
-
-        let pub_inputs1 = self.get_pub_inputs(&trace1);
-        let pub_inputs_elements1 = pub_inputs1.to_elements();
+        let pub_inputs_vec = traces.iter().map(|trace| self.get_pub_inputs(trace));
+        let pub_inputs_elements_vec = pub_inputs_vec
+            .map(|pub_inputs| pub_inputs.to_elements())
+            .collect();
 
         // create an instance of AIR for the provided parameters. this takes a generic description
         // of the computation (provided via AIR type), and creates a description of a specific
         // execution of the computation for the provided public inputs.
-        let air = Self::Air::new(trace.get_info(), pub_inputs, self.options().clone());
-
-        let air1 = Self::Air::new(trace1.get_info(), pub_inputs1, self.options().clone());
+        let airs = traces
+            .iter()
+            .zip(pub_inputs_vec)
+            .map(|(trace, pub_inputs)| {
+                Self::Air::new(trace.get_info(), pub_inputs, self.options().clone())
+            })
+            .collect();
 
         // create a channel which is used to simulate interaction between the prover and the
         // verifier; the channel will be used to commit to values and to draw randomness that
         // should come from the verifier.
         let mut channel = ProverChannel::<Self::Air, E, Self::HashFn, Self::RandomCoin>::new(
-            &air,
-            &air1,
-            pub_inputs_elements,
-            pub_inputs_elements1,
+            &airs,
+            pub_inputs_elements_vec,
         );
         //Shoulf be changed for multiple pub_inputs
         //probably already done
@@ -234,7 +231,12 @@ pub trait Prover {
         let now = Instant::now();
         // Keep in mind that here the traces are identitical so only having one domain is fine for
         // now
-        let domain = StarkDomain::new(&air);
+        let Some((greatest_domain_index, _)) = airs
+            .iter()
+            .map(|air| air.trace_length())
+            .enumerate()
+            .max_by_key(|(index, _)| index);
+        let domain = StarkDomain::new(&airs[greatest_domain_index]);
         #[cfg(feature = "std")]
         debug!(
             "Built domain of 2^{} elements in {} ms",
@@ -243,10 +245,10 @@ pub trait Prover {
         );
 
         // extend the main execution trace and build a Merkle tree from the extended trace
-        let (main_trace_lde, main_trace1_lde, main_trace_tree, main_trace_polys, main_trace1_polys) =
+        let traces_main_segment: Vec<_> = traces.iter().map(|trace| trace.main_segment()).collect();
+        let (main_traces_lde, main_trace_tree, main_traces_polys) =
             self.build_trace_commitment::<Self::BaseField>(
-                trace.main_segment(),
-                trace1.main_segment(),
+                traces_main_segment,
                 &domain,
             );
 
@@ -264,15 +266,15 @@ pub trait Prover {
         // data; for multi-segment traces these structs will be used as accumulators of all
         // trace segments
 
+        // For now all the traces are the same and will have the same blowup, how this changes will
+        // depend on Research solution once given
+        let blowups = main_traces_lde.iter().map(|_| domain.trace_to_lde_blowup()).collect();
         let mut trace_commitment = TraceCommitment::new(
-            main_trace_lde,
-            main_trace1_lde,
+            main_traces_lde,
             main_trace_tree,
-            domain.trace_to_lde_blowup(),
-            domain.trace_to_lde_blowup(),
+            blowups,
         );
-        let mut trace_polys = TracePolyTable::new(main_trace_polys);
-        let mut trace1_polys = TracePolyTable::new(main_trace1_polys);
+        let mut traces_polys = main_traces_polys.iter().map(|&main_trace_polys| TracePolyTable::new(main_trace_polys));
 
         // build auxiliary trace segments (if any), and append the resulting segments to trace
         // commitment and trace polynomial table structs
@@ -565,15 +567,12 @@ pub trait Prover {
     /// building a Merkle tree from the resulting hashes.
     fn build_trace_commitment<E>(
         &self,
-        trace: &ColMatrix<E>,
-        trace1: &ColMatrix<E>,
+        traces: Vec<&ColMatrix<E>>,
         domain: &StarkDomain<Self::BaseField>,
     ) -> (
-        RowMatrix<E>,
-        RowMatrix<E>,
+        Vec<RowMatrix<E>>,
         MerkleTree<Self::HashFn>,
-        ColMatrix<E>,
-        ColMatrix<E>,
+        Vec<ColMatrix<E>>,
     )
     where
         E: FieldElement<BaseField = Self::BaseField>,
@@ -581,18 +580,16 @@ pub trait Prover {
         // extend the execution trace
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let trace_polys = trace.interpolate_columns();
-        let trace1_polys = trace1.interpolate_columns();
-        let trace_lde =
-            RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace_polys, domain);
-        let trace1_lde =
-            RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace1_polys, domain);
+        let traces_polys: Vec<_> = traces.iter().map(|trace| trace.interpolate_columns()).collect();
+        let traces_lde: Vec<_> = traces_polys.iter().map(|trace_polys| RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace_polys, domain)).collect();
         #[cfg(feature = "std")]
+        let first_trace_lde = traces_lde[0];
+        let first_trace_polys = traces_polys[0];
         debug!(
             "Extended execution trace of {} columns from 2^{} to 2^{} steps ({}x blowup) in {} ms",
-            trace_lde.num_cols(),
-            trace_polys.num_rows().ilog2(),
-            trace_lde.num_rows().ilog2(),
+            first_trace_lde.num_cols(),
+            first_trace_polys.num_rows().ilog2(),
+            first_trace_lde.num_rows().ilog2(),
             domain.trace_to_lde_blowup(),
             now.elapsed().as_millis()
         );
@@ -600,7 +597,8 @@ pub trait Prover {
         // build trace commitment
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let trace_tree = trace_lde.commit_to_comb_rows(trace1_lde.clone());
+        let trace_tree = first_trace_lde.commit_to_comb_rows(traces_lde.clone());
+        // TODO^ This looks ugly how can we change it?
 
         #[cfg(feature = "std")]
         debug!(
@@ -609,7 +607,7 @@ pub trait Prover {
             now.elapsed().as_millis()
         );
 
-        (trace_lde, trace1_lde, trace_tree, trace_polys, trace1_polys)
+        (traces_lde, trace_tree, traces_polys)
     }
 
     /// Evaluates constraint composition polynomial over the LDE domain and builds a commitment

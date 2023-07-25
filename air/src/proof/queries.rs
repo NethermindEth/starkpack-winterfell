@@ -309,7 +309,11 @@ impl JointTraceQueries {
 
         // read bytes corresponding to each query, convert them into field elements,
         // and also hash them to build leaf nodes of the batch Merkle proof
-        let query_values = Table::<E>::from_bytes(&self.values, num_queries, values_per_query + values_per_query1)?;
+        let query_values = Table::<E>::from_bytes(
+            &self.values,
+            num_queries,
+            values_per_query + values_per_query1,
+        )?;
         let query_value = Table::<E>::from_bytes(&self.value, num_queries, values_per_query)?;
         let query_value1 = Table::<E>::from_bytes(&self.value1, num_queries, values_per_query1)?;
         let hashed_queries = query_values
