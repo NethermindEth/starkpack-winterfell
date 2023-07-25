@@ -106,9 +106,17 @@ where
     match air.options().field_extension() {
         FieldExtension::None => {
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&air, &air1, proof)?;
-            println!("Trace_queiries from verifier{:?}", channel.trace_queries);
-            perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, air1, channel, public_coin)
+            match VerifierChannel::new(&air, &air1, proof) {
+                Ok(channel) => {
+                    println!("Verifier channel creation successful");
+                    perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, air1, channel, public_coin)
+                },
+                Err(err) => {
+                    println!("Verifier channel creation failed");
+                    println!("Err: {}", err);
+                    Err(err)
+                },
+            }
         },
         FieldExtension::Quadratic => {
             if !<QuadExtension<AIR::BaseField>>::is_supported() {

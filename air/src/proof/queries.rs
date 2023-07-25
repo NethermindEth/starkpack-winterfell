@@ -296,7 +296,9 @@ impl JointTraceQueries {
 
         // make sure we have enough bytes to read the expected number of queries
         let num_query_bytes = E::ELEMENT_BYTES * values_per_query;
-        let expected_bytes = num_queries * num_query_bytes;
+        // !!!
+        // Bytes expected are double because leaf is double in size now
+        let expected_bytes = 2 * num_queries * num_query_bytes;
         if self.values.len() != expected_bytes {
             return Err(DeserializationError::InvalidValue(format!(
                 "expected {} query value bytes, but was {}",

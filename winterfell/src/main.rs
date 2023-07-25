@@ -127,12 +127,12 @@ fn main() {
         start: start1,
         result: result1,
     };
-    let validation = verify::<
-        WorkAir,
-        Blake3_256<BaseElement>,
-        DefaultRandomCoin<Blake3_256<BaseElement>>,
-    >(proof, pub_inputs, pub_inputs1)
-    .is_ok();
-    println!("{:?}", validation);
-    assert!(validation)
+    match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(proof, pub_inputs, pub_inputs1) {
+        Ok(validation) => {
+            println!("Proof is valid");
+        },
+        Err(err) => {
+            println!("Proof is not valid\nErr: {}", err);
+        }
+    }
 }
