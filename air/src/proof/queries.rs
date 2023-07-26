@@ -174,8 +174,7 @@ impl Deserializable for Queries {
 pub struct JointTraceQueries {
     paths: Vec<u8>,
     values: Vec<u8>,
-    value: Vec<u8>,
-    value1: Vec<u8>,
+    value_vec: Vec<Vec<u8>>,
 }
 
 impl JointTraceQueries {
@@ -195,8 +194,7 @@ impl JointTraceQueries {
     pub fn new<H: Hasher, E: FieldElement>(
         merkle_proof: BatchMerkleProof<H>,
         query_values: Vec<Vec<E>>,
-        query_value: Vec<Vec<E>>,
-        query_value1: Vec<Vec<E>>,
+        query_value_vec: Vec<Vec<Vec<E>>>,
     ) -> Self {
         assert!(!query_values.is_empty(), "query values cannot be empty");
         let elements_per_query = query_values[0].len();
@@ -204,19 +202,16 @@ impl JointTraceQueries {
             elements_per_query, 0,
             "a query must contain at least one evaluation"
         );
-        assert!(!query_value.is_empty(), "query values cannot be empty");
-        let elements_per_query_value = query_value[0].len();
-        assert_ne!(
-            elements_per_query_value, 0,
-            "a query must contain at least one evaluation"
-        );
-        assert!(!query_values.is_empty(), "query values cannot be empty");
-        let elements_per_query_value1 = query_value1[0].len();
-        assert_ne!(
-            elements_per_query_value1, 0,
-            "a query must contain at least one evaluation"
-        );
-
+        let mut vecs_per_query_value = Vec::new();
+        for query_value in query_value_vec.iter() {
+            assert!(!query_value.is_empty(), "query values cannot be empty");
+            let elements_per_query_value = query_value[0].len();
+            assert_ne!(
+                elements_per_query_value, 0,
+                "a query must contain at least one evaluation"
+            );
+            vecs_per_query_value.push(elements_per_query_value);
+        }
         // TODO: add debug check that values actually hash into the leaf nodes of the batch proof
 
         // concatenate all elements together into a single vector of bytes
@@ -230,27 +225,20 @@ impl JointTraceQueries {
             );
             values.write(elements);
         }
-        let mut value =
-            Vec::with_capacity(num_queries * elements_per_query_value * E::ELEMENT_BYTES);
-        for elements in query_value.iter() {
-            assert_eq!(
-                elements.len(),
-                elements_per_query_value,
-                "all queries must contain the same number of evaluations"
-            );
-            value.write(elements);
+        let mut value_vec = Vec::new();
+        for (i, query_value) in query_value_vec.iter().enumerate() {
+            let mut value =
+                Vec::with_capacity(num_queries * vecs_per_query_value[i] * E::ELEMENT_BYTES);
+            for elements in query_value.iter() {
+                assert_eq!(
+                    elements.len(),
+                    vecs_per_query_value[i],
+                    "all queries must contain the same number of evaluations"
+                );
+                value.write(elements);
+            }
+            value_vec.push(value);
         }
-        let mut value1 =
-            Vec::with_capacity(num_queries * elements_per_query_value1 * E::ELEMENT_BYTES);
-        for elements in query_value1.iter() {
-            assert_eq!(
-                elements.len(),
-                elements_per_query_value1,
-                "all queries must contain the same number of evaluations"
-            );
-            value1.write(elements);
-        }
-
         // serialize internal nodes of the batch Merkle proof; we care about internal nodes only
         // because leaf nodes can be reconstructed from hashes of query values
         let paths = merkle_proof.serialize_nodes();
@@ -258,8 +246,7 @@ impl JointTraceQueries {
         JointTraceQueries {
             paths,
             values,
-            value,
-            value1,
+            value_vec,
         }
     }
 

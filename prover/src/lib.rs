@@ -164,22 +164,22 @@ pub trait Prover {
     /// secret and public inputs. Public inputs must match the value returned from
     /// [Self::get_pub_inputs()](Prover::get_pub_inputs) for the provided trace.
     #[rustfmt::skip]
-    fn prove(&self, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
+    fn prove(&self, n:usize, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
         // figure out which version of the generic proof generation procedure to run. this is a sort
         // of static dispatch for selecting two generic parameter: extension field and hash function.
         match self.options().field_extension() {
-            FieldExtension::None => self.generate_proof::<Self::BaseField>(traces),
+            FieldExtension::None => self.generate_proof::<Self::BaseField>(n, traces),
             FieldExtension::Quadratic => {
                 if !<QuadExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(2));
                 }
-                self.generate_proof::<QuadExtension<Self::BaseField>>(traces)
+                self.generate_proof::<QuadExtension<Self::BaseField>>(n, traces)
             }
             FieldExtension::Cubic => {
                 if !<CubeExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(3));
                 }
-                self.generate_proof::<QuadExtension<Self::BaseField>>(traces)
+                self.generate_proof::<QuadExtension<Self::BaseField>>(n, traces)
             }
         }
     }
@@ -191,7 +191,7 @@ pub trait Prover {
     /// execution `trace` is valid against this prover's AIR.
     /// TODO: make this function un-callable externally?
     #[doc(hidden)]
-    fn generate_proof<E>(&self, mut traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError>
+    fn generate_proof<E>(&self, n:usize, mut traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError>
     where
         E: FieldElement<BaseField = Self::BaseField>,
     {
@@ -354,8 +354,9 @@ pub trait Prover {
         // This checks validity of both, assertions and state transitions. We do this in debug
         // mode only because this is a very expensive operation.
         #[cfg(debug_assertions)]
-        trace.validate(&air, &aux_trace_segments, &aux_trace_rand_elements);
-        trace1.validate(&air1, &aux_trace1_segments, &aux_trace1_rand_elements);
+        for (i,trace) in traces.iter().enumerate(){
+            trace.validate(&airs[i], &aux_trace_segments, &aux_trace_rand_elements);
+        }
 
         // 2 ----- evaluate constraints -----------------------------------------------------------
         // evaluate constraints specified by the AIR over the constraint evaluation domain, and
@@ -366,17 +367,20 @@ pub trait Prover {
         // identical denominators.
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let constraint_coeffs = channel.get_constraint_composition_coeffs();
-        let evaluator = ConstraintEvaluator::new(&air, aux_trace_rand_elements, constraint_coeffs);
-        let constraint_evaluations = evaluator.evaluate(trace_commitment.trace_table(), &domain);
-
-        let constraint_coeffs1 = channel.get_constraint_composition_coeffs();
-        let evaluator1 =
-            ConstraintEvaluator::new(&air1, aux_trace1_rand_elements, constraint_coeffs1);
-        let constraint_evaluations1 = evaluator1.evaluate(trace_commitment.trace1_table(), &domain);
+        let constraint_coeffs_vec = Vec::new();
+        let evaluator_vec = Vec::new();
+        let constraint_evaluations_vec = Vec::new();
+        for _ in 0..n{
+            let constraint_coeffs = channel.get_constraint_composition_coeffs();
+            constraint_coeffs_vec.push(constraint_coeffs);
+            let evaluator = ConstraintEvaluator::new(&air, aux_trace_rand_elements, constraint_coeffs);
+            evaluator_vec.push(evaluator)
+            let constraint_evaluations = evaluator.evaluate(trace_commitment.trace_table(), &domain);
+            constraint_evaluations_vec.push(constraint_evaluations);
+        } 
 
         // We need to combine all comp polys into one final polynomial.
-        let final_evaluations = constraint_evaluations.clone();
+        let final_evaluations = constraint_evaluations_vec[0].clone();
 
         #[cfg(feature = "std")]
         debug!(
@@ -395,19 +399,23 @@ pub trait Prover {
         //   trace_length - 1
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let (composition_poly, trace_length, num_cols) = constraint_evaluations
-            .into_comb_poly(air.context().num_constraint_composition_columns());
-        let (composition_poly1, trace1_length, num_cols1) = constraint_evaluations1
-            .into_comb_poly(air1.context().num_constraint_composition_columns());
-        //let final_coef = col_composition_poly + col_composition_poly1;
-        let mut final_comb_poly = composition_poly;
-        //for (i, (val, val1)) in composition_poly.iter().zip(composition_poly1).enumerate() {
-        //    final_comb_poly[i] = *val + val1;
-        //}
-        add_in_place(&mut final_comb_poly, &composition_poly1);
-        assert_eq!(trace_length, trace1_length, "Traces of different lenght");
-        assert_eq!(num_cols, num_cols1, "Traces of different number of columns");
-        let final_poly = final_evaluations.into_poly(final_comb_poly, trace_length, num_cols)?;
+        let composition_polys = Vec::new();
+        let trace_length_vec = Vec::new();
+        let num_cols_vec = Vec::new();
+        for (i,cons_eval) in constraint_evaluations_vec.iter().enumerate(){
+            let (composition_poly, trace_length, num_cols) = cons_eval
+            .into_comb_poly(air[i].context().num_constraint_composition_columns());
+            composition_polys.push(compositon_poly);
+            trace_length_vec.push(trace_length);
+            num_cols_vec.push(num_cols);
+        }
+        let mut final_comb_poly = composition_polys[0];
+        for comp_poly in composition_polys.iter().skip(1){
+            add_in_place(&mut final_comb_poly, &comp_poly);
+        }
+        //assert_eq!(trace_length, trace1_length, "Traces of different lenght");
+        //assert_eq!(num_cols, num_cols1, "Traces of different number of columns");
+        let final_poly = final_evaluations.into_poly(final_comb_poly, trace_length[0], num_cols[0])?;
 
         #[cfg(feature = "std")]
         debug!(
@@ -441,11 +449,8 @@ pub trait Prover {
         // evaluate trace and constraint polynomials at the OOD point z, and send the results to
         // the verifier. the trace polynomials are actually evaluated over two points: z and z * g,
         // where g is the generator of the trace domain.
-        let ood_trace_states = trace_polys.get_ood_frame(z);
-
-        let ood_trace1_states = trace1_polys.get_ood_frame(z);
-
-        channel.send_ood_trace_states(&ood_trace_states, &ood_trace1_states);
+        let ood_traces_states = traces_polys.iter().map(|&trace_polys|trace_polys.get_ood_frame(z));
+        channel.send_ood_trace_states(&ood_traces_states);
 
         //let ood_evaluations = composition_poly.evaluate_at(z);
         let ood_evaluations = final_poly.evaluate_at(z);
@@ -460,10 +465,8 @@ pub trait Prover {
         // combine all trace polynomials together and merge them into the DEEP composition
         // polynomial
         deep_composition_poly.add_trace_polys(
-            trace_polys,
-            ood_trace_states,
-            trace1_polys,
-            ood_trace1_states,
+            traces_polys,
+            ood_traces_states,
         );
         //deep_composition_poly.add_trace_polys(trace1_polys, ood_trace1_states);
         // merge columns of constraint composition polynomial into the DEEP composition polynomial;

@@ -61,8 +61,7 @@ pub struct StarkProof {
     /// the verifier.
     pub constraint_queries: Queries,
     /// Trace and constraint polynomial evaluations at an out-of-domain point.
-    pub ood_frame: OodFrame,
-    pub ood_frame1: OodFrame,
+    pub ood_frames: Vec<OodFrame>,
     /// Low-degree proof for a DEEP composition polynomial.
     pub fri_proof: FriProof,
     /// Proof-of-work nonce for query seed grinding.
