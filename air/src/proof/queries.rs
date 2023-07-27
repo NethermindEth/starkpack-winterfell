@@ -264,9 +264,8 @@ impl JointTraceQueries {
         self,
         domain_size: usize,
         num_queries: usize,
-        values_per_query: usize,
-        values_per_query1: usize,
-    ) -> Result<(BatchMerkleProof<H>, Table<E>, Table<E>, Table<E>), DeserializationError>
+        values_per_query_vec: Vec<usize>,
+    ) -> Result<(BatchMerkleProof<H>, Table<E>, Vec<Table<E>>), DeserializationError>
     where
         E: FieldElement,
         H: ElementHasher<BaseField = E::BaseField>,
@@ -276,13 +275,17 @@ impl JointTraceQueries {
             "domain size must be a power of two"
         );
         assert!(num_queries > 0, "there must be at least one query");
-        assert!(
-            values_per_query > 0,
-            "a query must contain at least one value"
-        );
+        let mut values_of_all_queries: usize = 0;
+        for values_per_query in values_per_query_vec.iter() {
+            assert!(
+                values_per_query > 0,
+                "a query must contain at least one value"
+            );
+            values_of_all_queries += values_per_query;
+        }
 
         // make sure we have enough bytes to read the expected number of queries
-        let num_query_bytes = E::ELEMENT_BYTES * (values_per_query + values_per_query1);
+        let num_query_bytes = E::ELEMENT_BYTES * (values_of_all_queries);
         // !!!
         // Bytes expected are double because leaf is double in size now
         let expected_bytes = num_queries * num_query_bytes;
@@ -296,13 +299,14 @@ impl JointTraceQueries {
 
         // read bytes corresponding to each query, convert them into field elements,
         // and also hash them to build leaf nodes of the batch Merkle proof
-        let query_values = Table::<E>::from_bytes(
-            &self.values,
-            num_queries,
-            values_per_query + values_per_query1,
-        )?;
-        let query_value = Table::<E>::from_bytes(&self.value, num_queries, values_per_query)?;
-        let query_value1 = Table::<E>::from_bytes(&self.value1, num_queries, values_per_query1)?;
+        let query_values =
+            Table::<E>::from_bytes(&self.values, num_queries, values_of_all_queries)?;
+        let mut query_value_vec = Vec::new();
+        for (value, values_per_query) in self.value_vec.iter().zip(values_per_query_vec.iter()) {
+            let query_value = Table::<E>::from_bytes(&value, num_queries, *values_per_query)?;
+            query_value_vec.push(query_value);
+        }
+        //let query_value = Table::<E>::from_bytes(&self.value, num_queries, values_per_query)?;
         let hashed_queries = query_values
             .rows()
             .map(|row| H::hash_elements(row))
@@ -316,7 +320,7 @@ impl JointTraceQueries {
             return Err(DeserializationError::UnconsumedBytes);
         }
 
-        Ok((merkle_proof, query_values, query_value, query_value1))
+        Ok((merkle_proof, query_values, query_value_vec))
     }
 }
 

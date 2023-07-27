@@ -51,7 +51,7 @@ const GRINDING_CONTRIBUTION_FLOOR: u32 = 80;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct StarkProof {
     /// Basic metadata about the execution of the computation described by this proof.
-    pub context: Context,
+    pub contexts: Vec<Context>,
     /// Commitments made by the prover during the commit phase of the protocol.
     pub commitments: Commitments,
     /// Decommitments of extended execution trace values (for all trace segments) at position
@@ -70,29 +70,29 @@ pub struct StarkProof {
 
 impl StarkProof {
     /// Returns STARK protocol parameters used to generate this proof.
-    pub fn options(&self) -> &ProofOptions {
-        self.context.options()
+    pub fn options(&self, i: usize) -> &ProofOptions {
+        self.contexts[i].options()
     }
 
     /// Returns a layout describing how columns of the execution trace described by this context
     /// are arranged into segments.
-    pub fn trace_layout(&self) -> &TraceLayout {
-        self.context.trace_layout()
+    pub fn trace_layout(&self, i: usize) -> &TraceLayout {
+        self.contexts[i].trace_layout()
     }
 
     /// Returns trace length for the computation described by this proof.
-    pub fn trace_length(&self) -> usize {
-        self.context.trace_length()
+    pub fn trace_length(&self, i: usize) -> usize {
+        self.contexts[i].trace_length()
     }
 
     /// Returns trace info for the computation described by this proof.
-    pub fn get_trace_info(&self) -> TraceInfo {
-        self.context.get_trace_info()
+    pub fn get_trace_info(&self, i: usize) -> TraceInfo {
+        self.contexts[i].get_trace_info()
     }
 
     /// Returns the size of the LDE domain for the computation described by this proof.
-    pub fn lde_domain_size(&self) -> usize {
-        self.context.lde_domain_size()
+    pub fn lde_domain_size(&self, i: usize) -> usize {
+        self.contexts[i].lde_domain_size()
     }
 
     // SECURITY LEVEL

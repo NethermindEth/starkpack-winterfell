@@ -198,7 +198,7 @@ where
         fri_proof: FriProof,
     ) -> StarkProof {
         StarkProof {
-            context: self.contexts[0],
+            contexts: self.contexts,
             commitments: self.commitments,
             ood_frames: self.ood_frames,
             trace_queries,
