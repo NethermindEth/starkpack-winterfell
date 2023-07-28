@@ -122,7 +122,7 @@ fn main() {
     );
     // Instantiate the prover and generate the proof.
     let prover = WorkProver::new(options);
-    let proof = prover.prove(traces);
+    let proof = prover.prove(2, traces).unwrap();
     // Verify the proof. The number of steps and options are encoded in the proof itself,
     // so we don't need to pass them explicitly to the verifier.
     let pub_inputs = PublicInputs { start, result };
