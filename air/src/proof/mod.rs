@@ -106,9 +106,9 @@ impl StarkProof {
     pub fn security_level<H: Hasher>(&self, conjectured: bool) -> u32 {
         if conjectured {
             get_conjectured_security(
-                self.context.options(),
-                self.context.num_modulus_bits(),
-                self.trace_length() as u64,
+                self.contexts[0].options(),
+                self.contexts[0].num_modulus_bits(),
+                self.trace_length(0) as u64,
                 H::COLLISION_RESISTANCE,
             )
         } else {
@@ -117,10 +117,10 @@ impl StarkProof {
 
             #[cfg(feature = "std")]
             get_proven_security(
-                self.context.options(),
-                self.context.num_modulus_bits(),
-                self.lde_domain_size() as u64,
-                self.trace_length() as u64,
+                self.contexts[0].options(),
+                self.contexts[0].num_modulus_bits(),
+                self.lde_domain_size(0) as u64,
+                self.trace_length(0) as u64,
                 H::COLLISION_RESISTANCE,
             )
         }
@@ -132,12 +132,13 @@ impl StarkProof {
     /// Serializes this proof into a vector of bytes.
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut result = Vec::new();
-        self.context.write_into(&mut result);
+        for context in self.contexts.iter() {
+            context.write_into(&mut result);
+        }
         self.commitments.write_into(&mut result);
         self.trace_queries.write_into(&mut result);
         self.constraint_queries.write_into(&mut result);
-        self.ood_frame.write_into(&mut result);
-        self.ood_frame1.write_into(&mut result);
+        self.ood_frames.write_into(&mut result);
         self.fri_proof.write_into(&mut result);
         result.extend_from_slice(&self.pow_nonce.to_le_bytes());
         result
@@ -147,17 +148,21 @@ impl StarkProof {
     ///
     /// # Errors
     /// Returns an error of a valid STARK proof could not be read from the specified `source`.
-    pub fn from_bytes(source: &[u8]) -> Result<Self, DeserializationError> {
+    pub fn from_bytes(&self, source: &[u8]) -> Result<Self, DeserializationError> {
         let mut source = SliceReader::new(source);
 
         // parse the context
-        let context = Context::read_from(&mut source)?;
+        let contexts = self
+            .contexts
+            .iter()
+            .map(|context| Context::read_from(&mut source))
+            .collect();
 
         // parse the commitments
         let commitments = Commitments::read_from(&mut source)?;
 
         // parse trace queries
-        let num_trace_segments = context.trace_layout().num_segments();
+        let num_trace_segments = contexts[0].trace_layout().num_segments();
         //We may need to change something here!!
         let mut trace_queries = Vec::with_capacity(num_trace_segments);
         for _ in 0..num_trace_segments {
@@ -166,12 +171,11 @@ impl StarkProof {
 
         // parse the rest of the proof
         let proof = StarkProof {
-            context,
+            contexts,
             commitments,
             trace_queries,
             constraint_queries: Queries::read_from(&mut source)?,
-            ood_frame: OodFrame::read_from(&mut source)?,
-            ood_frame1: OodFrame::read_from(&mut source)?,
+            ood_frames: OodFrame::read_from(&mut source)?,
             fri_proof: FriProof::read_from(&mut source)?,
             pow_nonce: source.read_u64()?,
         };

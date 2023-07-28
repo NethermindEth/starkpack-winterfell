@@ -278,7 +278,7 @@ impl JointTraceQueries {
         let mut values_of_all_queries: usize = 0;
         for values_per_query in values_per_query_vec.iter() {
             assert!(
-                values_per_query > 0,
+                *values_per_query > 0,
                 "a query must contain at least one value"
             );
             values_of_all_queries += values_per_query;
@@ -354,8 +354,7 @@ impl Deserializable for JointTraceQueries {
         Ok(JointTraceQueries {
             paths,
             values,
-            value: vec![],
-            value1: vec![],
+            value_vec: vec![vec![]],
         })
     }
 }

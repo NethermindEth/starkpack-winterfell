@@ -103,8 +103,8 @@ where
     /// Saves the evaluations of trace polynomials over the out-of-domain evaluation frame. This
     /// also reseeds the public coin with the hashes of the evaluation frame states.
     pub fn send_ood_trace_states(&mut self, trace_states_vec: Vec<&[Vec<E>]>) {
-        for trace_states in trace_states_vec.iter() {
-            let result = self.ood_frame.set_trace_states(trace_states);
+        for (trace_states, ood_frame) in trace_states_vec.iter().zip(self.ood_frames.iter()) {
+            let result = ood_frame.set_trace_states(trace_states);
             self.public_coin.reseed(H::hash_elements(&result));
         }
     }
