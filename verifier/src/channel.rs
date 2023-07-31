@@ -172,7 +172,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     ///
     /// For computations requiring multiple trace segments, evaluations of auxiliary trace
     /// polynomials are also included.
-    pub fn read_ood_trace_frame(&mut self) -> Vec<TraceOodFrame<E>> {
+    pub fn read_ood_traces_frame(&mut self) -> Vec<TraceOodFrame<E>> {
         let traces_ood_frame = self
             .ood_traces_frame
             .iter()
@@ -204,7 +204,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     pub fn read_queried_trace_states(
         &mut self,
         positions: &[usize],
-    ) -> Result<(Vec<Table<E::BaseField>>, Option<Table<E>>), VerifierError> {
+    ) -> Result<(Vec<Table<E::BaseField>>, Vec<Option<Table<E>>>), VerifierError> {
         let queries = self.trace_queries.take().expect("already read");
         //*****
         //MerkleTree check needs to be modified
@@ -214,7 +214,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
                 .map_err(|_| VerifierError::TraceQueryDoesNotMatchCommitment)?;
         }
         //*/
-        Ok((queries.main_states_vec, queries.aux_states))
+        Ok((queries.main_states_vec, queries.aux_states_vec))
     }
 
     /// Returns constraint evaluations at the specified positions of the LDE domain. This also
@@ -277,7 +277,7 @@ pub struct TraceQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseFie
     query_proofs: Vec<BatchMerkleProof<H>>,
     comb_states: Table<E::BaseField>,
     main_states_vec: Vec<Table<E::BaseField>>,
-    aux_states: Option<Table<E>>,
+    aux_states_vec: Vec<Option<Table<E>>>,
 }
 
 impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> Clone for TraceQueries<E, H> {
@@ -286,7 +286,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> Clone for Trac
             query_proofs: self.query_proofs.clone(),
             comb_states: self.comb_states.clone(),
             main_states_vec: self.main_states_vec.clone(),
-            aux_states: self.aux_states.clone(),
+            aux_states_vec: self.aux_states_vec.clone(),
         }
     }
 }
@@ -320,7 +320,11 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
         let main_segment_queries = queries.remove(0);
         let (main_segment_query_proofs, comb_segment_states, main_segments_states) =
             main_segment_queries
-                .parse::<H, E::BaseField>(air.lde_domain_size(), num_queries, main_segments_width)
+                .parse::<H, E::BaseField>(
+                    airs[0].lde_domain_size(),
+                    num_queries,
+                    main_segments_width,
+                )
                 .map_err(|err| {
                     VerifierError::ProofDeserializationError(format!(
                         "main trace segment query deserialization failed: {err}"
@@ -362,7 +366,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
             query_proofs,
             comb_states: comb_segment_states,
             main_states_vec: main_segments_states,
-            aux_states: aux_trace_states,
+            aux_states_vec: aux_trace_states,
         })
     }
 }

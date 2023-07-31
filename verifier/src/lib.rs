@@ -168,7 +168,7 @@ where
     public_coin.reseed(trace_commitments[0]);
     // process auxiliary trace segments (if any), to build a set of random elements for each segment
     let aux_traces_rand_elements = Vec::new();
-    for _ in 0..air.len() {
+    for air in airs.iter() {
         let mut aux_trace_rand_elements = AuxTraceRandElements::<E>::new();
         for (i, commitment) in trace_commitments.iter().skip(1).enumerate() {
             let rand_elements = air
@@ -204,7 +204,7 @@ where
     // read the out-of-domain trace frames (the main trace frame and auxiliary trace frame, if
     // provided) sent by the prover and evaluate constraints over them; also, reseed the public
     // coin with the OOD frames received from the prover.
-    let ood_traces_frame = channel.read_ood_trace_frame();
+    let ood_traces_frame = channel.read_ood_traces_frame();
     let mut ood_constraint_evaluation = E::new(0);
     let ood_main_traces_frame = ood_traces_frame
         .iter()
@@ -217,8 +217,8 @@ where
     for (i, ood_trace_frame) in ood_traces_frame.iter().enumerate() {
         let ood_aux_trace_frame = ood_trace_frame.aux_frame();
         let ood_constraint_evaluation_1 = evaluate_constraints(
-            &air,
-            constraint_coeffs,
+            &airs[i],
+            constraints_coeffs[i],
             &ood_main_traces_frame[i],
             &ood_aux_traces_frame[i],
             aux_traces_rand_elements[i],
@@ -266,8 +266,8 @@ where
     let fri_verifier = FriVerifier::new(
         &mut channel,
         &mut public_coin,
-        air.options().to_fri_options(),
-        air.trace_poly_degree(),
+        airs[0].options().to_fri_options(),
+        airs[0].trace_poly_degree(),
     )
     .map_err(VerifierError::FriVerificationFailed)?;
     // TODO: make sure air.lde_domain_size() == fri_verifier.domain_size()
@@ -287,12 +287,12 @@ where
     // and the prover responds with decommitments against these positions for trace and constraint
     // composition polynomial evaluations.
     let query_positions = public_coin
-        .draw_integers(air.options().num_queries(), air.lde_domain_size())
+        .draw_integers(airs[0].options().num_queries(), airs[0].lde_domain_size())
         .map_err(|_| VerifierError::RandomCoinError)?;
 
     // read evaluations of trace and constraint composition polynomials at the queried positions;
     // this also checks that the read values are valid against trace and constraint commitments
-    let (queried_main_trace_states_vec, queried_aux_trace_states) =
+    let (queried_main_trace_states_vec, queried_aux_traces_states) =
         channel.read_queried_trace_states(&query_positions)?;
     let queried_constraint_evaluations = channel.read_constraint_evaluations(&query_positions)?;
 
@@ -301,7 +301,7 @@ where
     let composer = DeepComposer::new(&airs[0], &query_positions, z, deep_coefficients);
     let t_composition = composer.compose_trace_columns(
         queried_main_trace_states_vec,
-        queried_aux_trace_states,
+        queried_aux_traces_states,
         ood_main_traces_frame,
         ood_aux_traces_frame,
     );

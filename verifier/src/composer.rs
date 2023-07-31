@@ -142,7 +142,7 @@ impl<E: FieldElement> DeepComposer<E> {
         let final_num = rem_results
             .into_iter()
             .fold(|acc, next_result| add_in_place(&mut first_num, &next_result));
-        result_den = batch_inversion(&results_den[0]);
+        let result_den = batch_inversion(&results_den[0]);
         final_num
             .iter()
             .zip(result_den)
