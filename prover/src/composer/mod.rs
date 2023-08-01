@@ -66,8 +66,10 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
         ood_traces_states: Vec<Vec<Vec<E>>>,
     ) {
         //assert!(self.coefficients.is_empty());
-        
-        for (index,(trace_poly, ood_trace_states)) in traces_polys.iter().enumerate().zip(ood_traces_states.iter()){
+        let mut trace_poly_vec = Vec::new();
+        for (index, trace_polys) in traces_polys.iter().enumerate()
+        //.zip(ood_traces_states.iter())
+        {
             // compute a second out-of-domain point offset from z by exactly trace generator; this
             // point defines the "next" computation state in relation to point z
             let trace_length = trace_polys.poly_size();
@@ -88,7 +90,7 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
                 acc_trace_poly::<E::BaseField, E>(
                     &mut t1_composition,
                     poly,
-                    ood_trace_states[0][i],
+                    ood_traces_states[index][0][i],
                     self.cc.traces[index][i],
                 );
 
@@ -97,8 +99,8 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
                 acc_trace_poly::<E::BaseField, E>(
                     &mut t2_composition,
                     poly,
-                    ood_trace_states[1][i],
-                    self.cc.trace[index][i],
+                    ood_traces_states[index][1][i],
+                    self.cc.traces[index][i],
                 );
 
                 i += 1;
@@ -110,8 +112,8 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
                 acc_trace_poly::<E, E>(
                     &mut t1_composition,
                     poly,
-                    ood_trace_states[0][i],
-                    self.cc.trace[index][i],
+                    ood_traces_states[index][0][i],
+                    self.cc.traces[index][i],
                 );
 
                 // compute T''(x) = T(x) - T(z * g), multiply it by a pseudo-random coefficient,
@@ -119,26 +121,30 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
                 acc_trace_poly::<E, E>(
                     &mut t2_composition,
                     poly,
-                    ood_trace_states[1][i],
-                    self.cc.trace[index][i],
+                    ood_traces_states[index][1][i],
+                    self.cc.traces[index][i],
                 );
 
                 i += 1;
+            }
             // divide the composition polynomials by (x - z) and (x - z * g), respectively,
             // and add the resulting polynomials together; the output of this step
             // is a single trace polynomial T(x) and deg(T(x)) = trace_length - 2.
 
             //Not sure if this works
-            let trace_poly =
-            merge_trace_compositions(vec![t1_composition, t2_composition], vec![self.z, next_z]);
-            if index == 0{
-                let mut final_trace_poly = trace_poly;
-            }
-            else {
-                add_in_place(&mut final_trace_poly, &trace1_poly);
-            }
+            let trace_poly = merge_trace_compositions(
+                vec![t1_composition, t2_composition],
+                vec![self.z, next_z],
+            );
+            trace_poly_vec.push(trace_poly);
         }
-        
+        let mut first_poly = trace_poly_vec[0];
+        let rem_polys = trace_poly_vec.iter().skip(1).collect();
+        let final_trace_poly = trace_poly_vec
+            .into_iter()
+            .fold(first_poly, |acc, next_poly| {
+                add_in_place(&mut acc, &next_poly)
+            });
         // set the coefficients of the DEEP composition polynomial
         self.coefficients = final_trace_poly;
         assert_eq!(self.poly_size() - 2, self.degree());

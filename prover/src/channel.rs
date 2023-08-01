@@ -79,7 +79,7 @@ where
             public_coin: RandomCoin::new(&coin_seed_elements),
             contexts,
             commitments: Commitments::default(),
-            ood_frames: vec![n; OodFrame::default()],
+            ood_frames: vec![OodFrame::default(); n],
             pow_nonce: 0,
             _field_element: PhantomData,
         }

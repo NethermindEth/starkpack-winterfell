@@ -138,7 +138,9 @@ impl StarkProof {
         self.commitments.write_into(&mut result);
         self.trace_queries.write_into(&mut result);
         self.constraint_queries.write_into(&mut result);
-        self.ood_frames.write_into(&mut result);
+        for ood_frame in self.ood_frames.iter() {
+            ood_frame.write_into(&mut result);
+        }
         self.fri_proof.write_into(&mut result);
         result.extend_from_slice(&self.pow_nonce.to_le_bytes());
         result
@@ -152,12 +154,15 @@ impl StarkProof {
         let mut source = SliceReader::new(source);
 
         // parse the context
-        let contexts = self
-            .contexts
-            .iter()
-            .map(|context| Context::read_from(&mut source))
-            .collect();
-
+        //let contexts = self
+        //    .contexts
+        //    .iter()
+        //    .map(|context| Context::read_from(&mut source))
+        //    .collect();
+        let mut contexts = Vec::new();
+        for _ in self.contexts.iter() {
+            contexts.push(Context::read_from(&mut source)?);
+        }
         // parse the commitments
         let commitments = Commitments::read_from(&mut source)?;
 
@@ -168,14 +173,18 @@ impl StarkProof {
         for _ in 0..num_trace_segments {
             trace_queries.push(JointTraceQueries::read_from(&mut source)?);
         }
-
+        let constraint_queries = Queries::read_from(&mut source)?;
+        let mut ood_frames = Vec::new();
+        for _ in self.ood_frames.iter() {
+            ood_frames.push(OodFrame::read_from(&mut source)?);
+        }
         // parse the rest of the proof
         let proof = StarkProof {
             contexts,
             commitments,
             trace_queries,
-            constraint_queries: Queries::read_from(&mut source)?,
-            ood_frames: OodFrame::read_from(&mut source)?,
+            constraint_queries, //: Queries::read_from(&mut source)?,
+            ood_frames,
             fri_proof: FriProof::read_from(&mut source)?,
             pow_nonce: source.read_u64()?,
         };

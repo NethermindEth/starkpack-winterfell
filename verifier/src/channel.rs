@@ -46,7 +46,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     // --------------------------------------------------------------------------------------------
     /// Creates and returns a new [VerifierChannel] initialized from the specified `proof`.
     pub fn new<A: Air<BaseField = E::BaseField>>(
-        airs: Vec<&A>,
+        airs: &Vec<A>,
         proof: StarkProof,
     ) -> Result<Self, VerifierError> {
         let StarkProof {
@@ -298,7 +298,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
         mut queries: Vec<JointTraceQueries>,
         airs: Vec<&A>,
     ) -> Result<Self, VerifierError> {
-        for air in airs.iter() {
+        /*for air in airs.iter() {
             assert_eq!(
                 queries.len(),
                 air.trace_layout().num_segments(),
@@ -306,7 +306,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
                 air.trace_layout().num_segments(),
                 queries.len()
             );
-        }
+        }*/
 
         /////
         let num_queries = airs[0].options().num_queries();
@@ -343,7 +343,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
                     .iter()
                     .map(|air| air.trace_layout().get_aux_segment_width(i))
                     .collect();
-                let (segment_query_proof, aux_comb_trace_states, segments_trace_states) =
+                let (segment_query_proof, aux_comb_trace_states, segment_traces_states) =
                     segment_queries
                         .parse::<H, E>(airs[0].lde_domain_size(), num_queries, aux_segments_width)
                         .map_err(|err| {
@@ -353,7 +353,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
                         })?;
 
                 query_proofs.push(segment_query_proof);
-                aux_trace_states.push(segment_trace_states);
+                aux_trace_states.push(segment_traces_states);
             }
 
             // merge tables for each auxiliary segment into a single table

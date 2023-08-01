@@ -92,22 +92,25 @@ where
     // build a seed for the public coin; the initial seed is a hash of the proof context and the
     // public inputs, but as the protocol progresses, the coin will be reseeded with the info
     // received from the prover
-    let mut public_coin_seed = proof.context.to_elements();
+    let mut public_coin_seed = proof.contexts[0].to_elements();
     for pub_inputs in pub_inputs_vec.iter(){
         public_coin_seed.append(&mut pub_inputs.to_elements());
     }
     
     // create AIR instance for the computation specified in the proof
-    let airs = pub_inputs_vec.iter().enumerate().
-    map(|(i,public_inputs)|AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).clone())).collect();
-    
+    //let airs = pub_inputs_vec.iter().enumerate().
+    //map(|(i,&pub_inputs)|AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).clone())).collect();
+    let mut airs = Vec::new();
+    for (i,&pub_inputs) in pub_inputs_vec.iter().enumerate(){
+        airs.push(AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).clone()));
+    }
 
     // figure out which version of the generic proof verification procedure to run. this is a sort
     // of static dispatch for selecting two generic parameter: extension field and hash function.
-    match air.options().field_extension() {
+    match airs[0].options().field_extension() {
         FieldExtension::None => {
             let public_coin = RandCoin::new(&public_coin_seed);
-            match VerifierChannel::new(&air, &air1, proof) {
+            match VerifierChannel::new(&airs, proof) {
                 Ok(channel) => {
                     println!("Verifier channel creation successful");
                     perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(airs, channel, public_coin)
@@ -124,7 +127,7 @@ where
                 return Err(VerifierError::UnsupportedFieldExtension(2));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&air, &air1, proof)?;
+            let channel = VerifierChannel::new(&airs, proof)?;
             perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(airs, channel, public_coin)
         },
         FieldExtension::Cubic => {
@@ -132,7 +135,7 @@ where
                 return Err(VerifierError::UnsupportedFieldExtension(3));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&air, &air1, proof)?;
+            let channel = VerifierChannel::new(&airs, proof)?;
             perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(airs, channel, public_coin)
         },
     }
@@ -167,7 +170,7 @@ where
     // reseed the coin with the commitment to the main trace segment
     public_coin.reseed(trace_commitments[0]);
     // process auxiliary trace segments (if any), to build a set of random elements for each segment
-    let aux_traces_rand_elements = Vec::new();
+    let mut aux_traces_rand_elements = Vec::new();
     for air in airs.iter() {
         let mut aux_trace_rand_elements = AuxTraceRandElements::<E>::new();
         for (i, commitment) in trace_commitments.iter().skip(1).enumerate() {
@@ -180,10 +183,13 @@ where
         aux_traces_rand_elements.push(aux_trace_rand_elements);
     }
     // build random coefficients for the composition polynomial
-    let constraints_coeffs = airs.iter().map(|air| {
-        air.get_constraint_composition_coefficients(&mut public_coin)
-            .map_err(|_| VerifierError::RandomCoinError)?
-    });
+    let mut constraints_coeffs = Vec::new();
+    for air in airs.iter() {
+        constraints_coeffs.push(
+            air.get_constraint_composition_coefficients(&mut public_coin)
+                .map_err(|_| VerifierError::RandomCoinError)?,
+        )
+    }
     // 2 ----- constraint commitment --------------------------------------------------------------
     // read the commitment to evaluations of the constraint composition polynomial over the LDE
     // domain sent by the prover, use it to update the public coin, and draw an out-of-domain point
@@ -241,7 +247,7 @@ where
             .iter()
             .enumerate()
             .fold(E::ZERO, |result, (i, &value)| {
-                result + z.exp_vartime(((i * (air.trace_length())) as u32).into()) * value
+                result + z.exp_vartime(((i * (airs[i].trace_length())) as u32).into()) * value
             });
     public_coin.reseed(H::hash_elements(&ood_constraint_evaluations));
 
@@ -254,7 +260,7 @@ where
     // interactive version of the protocol, the verifier sends these coefficients to the prover
     // and the prover uses them to compute the DEEP composition polynomial. the prover, then
     // applies FRI protocol to the evaluations of the DEEP composition polynomial.
-    let deep_coefficients = air[0]
+    let deep_coefficients = airs[0]
         .get_deep_composition_coefficients::<A, E, R>(&airs, &mut public_coin)
         .map_err(|_| VerifierError::RandomCoinError)?;
 
@@ -278,7 +284,7 @@ where
     public_coin.reseed_with_int(pow_nonce);
 
     // make sure the proof-of-work specified by the grinding factor is satisfied
-    if public_coin.leading_zeros() < air.options().grinding_factor() {
+    if public_coin.leading_zeros() < airs[0].options().grinding_factor() {
         return Err(VerifierError::QuerySeedProofOfWorkVerificationFailed);
     }
 

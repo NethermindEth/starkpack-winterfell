@@ -141,7 +141,7 @@ where
     E: FieldElement,
     H: ElementHasher<BaseField = E::BaseField>,
 {
-    let traces_states = Vec::new();
+    let mut traces_states = Vec::new();
     for segment_lde in segments_lde.iter() {
         // for each position, get the corresponding row from the trace segment LDE and put all these
         // rows into a single vector
