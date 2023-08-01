@@ -65,7 +65,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
             aux_segment_tree.leaves().len(),
             "number of rows in trace LDE must be the same as number of leaves in trace commitment"
         );
-        for trace_lde in self.traces_lde {
+        for mut trace_lde in self.traces_lde {
             trace_lde.add_aux_segment(aux_segment_lde);
             self.aux_segment_trees.push(aux_segment_tree);
         }
@@ -153,15 +153,15 @@ where
     }
     let first_states = traces_states[0];
     let mut comb_states = Vec::with_capacity(first_states.len());
-    let rem_traces_states = traces_states.iter().skip(1).collect();
+    let rem_traces_states: Vec<_> = traces_states.iter().skip(1).collect();
     for (i, row) in first_states.iter().enumerate() {
-        let trace_row = &row[..];
+        let trace_row = row[..].to_vec();
         //let trace1_row = &trace1_states[i][..];
         comb_states.push(
             rem_traces_states
                 .into_iter()
                 .fold(trace_row, |acc, next_trace_states| {
-                    &[trace_row, &next_trace_states[i][..]].concat()
+                    [trace_row, next_trace_states[i][..].to_vec()].concat()
                 }),
         );
     }

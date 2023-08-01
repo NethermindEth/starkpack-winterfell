@@ -561,7 +561,7 @@ pub trait Prover {
     /// building a Merkle tree from the resulting hashes.
     fn build_trace_commitment<E>(
         &self,
-        traces: Vec<ColMatrix<E>>,
+        traces: Vec<&ColMatrix<E>>,
         domain: &StarkDomain<Self::BaseField>,
     ) -> (
         Vec<RowMatrix<E>>,

@@ -102,7 +102,7 @@ where
     //map(|(i,&pub_inputs)|AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).clone())).collect();
     let mut airs = Vec::new();
     for (i,&pub_inputs) in pub_inputs_vec.iter().enumerate(){
-        airs.push(AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).clone()));
+        airs.push(&AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).clone()));
     }
 
     // figure out which version of the generic proof verification procedure to run. this is a sort
@@ -110,7 +110,7 @@ where
     match airs[0].options().field_extension() {
         FieldExtension::None => {
             let public_coin = RandCoin::new(&public_coin_seed);
-            match VerifierChannel::new(&airs, proof) {
+            match VerifierChannel::new(airs, proof) {
                 Ok(channel) => {
                     println!("Verifier channel creation successful");
                     perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(airs, channel, public_coin)
@@ -127,7 +127,7 @@ where
                 return Err(VerifierError::UnsupportedFieldExtension(2));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&airs, proof)?;
+            let channel = VerifierChannel::new(airs, proof)?;
             perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(airs, channel, public_coin)
         },
         FieldExtension::Cubic => {
@@ -135,7 +135,7 @@ where
                 return Err(VerifierError::UnsupportedFieldExtension(3));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&airs, proof)?;
+            let channel = VerifierChannel::new(airs, proof)?;
             perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(airs, channel, public_coin)
         },
     }
@@ -146,7 +146,7 @@ where
 /// Performs the actual verification by reading the data from the `channel` and making sure it
 /// attests to a correct execution of the computation specified by the provided `air`.
 fn perform_verification<A, E, H, R>(
-    airs: Vec<A>,
+    airs: Vec<&A>,
     mut channel: VerifierChannel<E, H>,
     mut public_coin: R,
 ) -> Result<(), VerifierError>
@@ -211,12 +211,12 @@ where
     // provided) sent by the prover and evaluate constraints over them; also, reseed the public
     // coin with the OOD frames received from the prover.
     let ood_traces_frame = channel.read_ood_traces_frame();
-    let mut ood_constraint_evaluation = E::new(0);
-    let ood_main_traces_frame = ood_traces_frame
+    let mut ood_constraint_evaluation = E::ZERO;
+    let ood_main_traces_frame: Vec<_> = ood_traces_frame
         .iter()
         .map(|ood_trace_frame| ood_trace_frame.main_frame())
         .collect();
-    let ood_aux_traces_frame = ood_traces_frame
+    let ood_aux_traces_frame: Vec<_> = ood_traces_frame
         .iter()
         .map(|ood_trace_frame| ood_trace_frame.aux_frame())
         .collect();

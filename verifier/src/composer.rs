@@ -55,7 +55,7 @@ impl<E: FieldElement> DeepComposer<E> {
     pub fn compose_trace_columns(
         &self,
         queried_main_traces_states: Vec<Table<E::BaseField>>,
-        queried_aux_traces_states: Vec<Option<Table<E>>>,
+        queried_aux_traces_states: Option<Vec<Table<E>>>,
         ood_main_frames: Vec<EvaluationFrame<E>>,
         ood_aux_frames: Vec<Option<EvaluationFrame<E>>>,
     ) -> Vec<E> {
@@ -67,7 +67,10 @@ impl<E: FieldElement> DeepComposer<E> {
         let mut results_num = Vec::new();
         let mut results_den = Vec::new();
         for (index, queried_main_trace_states) in queried_main_traces_states.iter().enumerate() {
-            let ood_main_trace_states = [ood_main_frames[index].current(), ood_main_frames[index].next()];
+            let ood_main_trace_states = [
+                ood_main_frames[index].current(),
+                ood_main_frames[index].next(),
+            ];
             let n = queried_main_trace_states.num_rows();
             let mut result_num = Vec::<E>::with_capacity(n);
             let mut result_den = Vec::<E>::with_capacity(n);
@@ -101,7 +104,7 @@ impl<E: FieldElement> DeepComposer<E> {
 
             // if the trace has auxiliary segments, compose columns from these segments as well; we
             // also do this separately for numerators and denominators.
-            if let Some(queried_aux_traces_states[index]) = queried_aux_traces_states[index] {
+            if let Some(queried_aux_trace_states) = queried_aux_traces_states {
                 let ood_aux_frame = ood_aux_frames[index].expect("missing auxiliary OOD frame");
                 let ood_aux_trace_states = [ood_aux_frame.current(), ood_aux_frame.next()];
 
@@ -110,7 +113,7 @@ impl<E: FieldElement> DeepComposer<E> {
                 let cc_offset = queried_main_trace_states.num_columns();
 
                 for ((j, row), &x) in (0..n)
-                    .zip(queried_aux_traces_states[index].rows())
+                    .zip(queried_aux_trace_states[index].rows())
                     .zip(&self.x_coordinates)
                 {
                     let mut t1_num = E::ZERO;
@@ -118,13 +121,13 @@ impl<E: FieldElement> DeepComposer<E> {
                     for (i, &value) in row.iter().enumerate() {
                         // compute the numerator of T'_i(x) as (T_i(x) - T_i(z)), multiply it by a
                         // composition coefficient, and add the result to the numerator aggregator
-                        t1_num +=
-                            (value - ood_aux_trace_states[0][i]) * self.cc.traces[index][cc_offset + i];
+                        t1_num += (value - ood_aux_trace_states[0][i])
+                            * self.cc.traces[index][cc_offset + i];
 
                         // compute the numerator of T''_i(x) as (T_i(x) - T_i(z * g)), multiply it by a
                         // composition coefficient, and add the result to the numerator aggregator
-                        t2_num +=
-                            (value - ood_aux_trace_states[1][i]) * self.cc.traces[index][cc_offset + i];
+                        t2_num += (value - ood_aux_trace_states[1][i])
+                            * self.cc.traces[index][cc_offset + i];
                     }
 
                     // compute the common denominators (x - z) and (x - z * g), and use the to aggregate
@@ -138,10 +141,13 @@ impl<E: FieldElement> DeepComposer<E> {
             results_den.push(result_den);
         }
         let first_num = results_num[0];
-        let rem_results = results_num.iter().skip(1).collect();
+        let rem_results: Vec<_> = results_num.iter().skip(1).collect();
         let final_num = rem_results
             .into_iter()
-            .fold(first_num,|acc, next_result| add_in_place(&mut acc, &next_result));
+            .fold(first_num, |mut acc, next_result| {
+                add_in_place(&mut acc, &next_result);
+                acc
+            });
         let result_den = batch_inversion(&results_den[0]);
         final_num
             .iter()
