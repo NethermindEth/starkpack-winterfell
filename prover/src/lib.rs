@@ -277,7 +277,7 @@ pub trait Prover {
         let mut trace_commitment = TraceCommitment::new(main_traces_lde, main_trace_tree, blowups);
         let traces_polys: Vec<_> = main_traces_polys
             .iter()
-            .map(|&main_trace_polys| TracePolyTable::new(main_trace_polys))
+            .map(|&main_trace_polys| TracePolyTable::new(*main_trace_polys))
             .collect();
 
         // build auxiliary trace segments (if any), and append the resulting segments to trace
@@ -441,11 +441,15 @@ pub trait Prover {
         // evaluate trace and constraint polynomials at the OOD point z, and send the results to
         // the verifier. the trace polynomials are actually evaluated over two points: z and z * g,
         // where g is the generator of the trace domain.
-        let ood_traces_states: Vec<&[Vec<E>]> = traces_polys
+        let ood_traces_states: Vec<Vec<Vec<E>>> = traces_polys
             .iter()
-            .map(|&trace_polys| trace_polys.get_ood_frame(z))
+            .map(|trace_polys| trace_polys.get_ood_frame(z))
             .collect();
-        channel.send_ood_trace_states(ood_traces_states);
+        let ood_trace_states_vec: Vec<&[Vec<E>]> = ood_traces_states
+            .iter()
+            .map(|ood_trace_states| &ood_trace_states[..])
+            .collect();
+        channel.send_ood_trace_states(ood_trace_states_vec);
 
         //let ood_evaluations = composition_poly.evaluate_at(z);
         let ood_evaluations = final_poly.evaluate_at(z);
@@ -567,7 +571,7 @@ pub trait Prover {
     ) -> (
         Vec<RowMatrix<E>>,
         MerkleTree<Self::HashFn>,
-        Vec<ColMatrix<E>>,
+        Vec<&ColMatrix<E>>,
     )
     where
         E: FieldElement<BaseField = Self::BaseField>,
@@ -577,7 +581,7 @@ pub trait Prover {
         let now = Instant::now();
         let traces_polys: Vec<_> = traces
             .iter()
-            .map(|trace| trace.interpolate_columns())
+            .map(|trace| &trace.interpolate_columns())
             .collect();
         let traces_lde: Vec<_> = traces_polys
             .iter()

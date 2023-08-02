@@ -110,7 +110,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
         let mut ood_traces_evaluations = Vec::new();
         let mut ood_constraints_evaluations = Vec::new();
         let mut ood_traces_frame = Vec::new();
-        for (i, ood_frame) in ood_frames.iter().enumerate() {
+        for (i, &ood_frame) in ood_frames.iter().enumerate() {
             let (ood_trace_evaluations, ood_constraint_evaluations) = ood_frame
                 .parse(
                     main_traces_width[i],
@@ -143,7 +143,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             // out-of-domain evaluation
             ood_traces_frame: ood_traces_frame
                 .iter()
-                .map(|ood_trace_frame| Some(ood_trace_frame))
+                .map(|&ood_trace_frame| Some(ood_trace_frame))
                 .collect(),
             ood_constraint_evaluations: Some(ood_constraints_evaluations[0]),
             // query seed
