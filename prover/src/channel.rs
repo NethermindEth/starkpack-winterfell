@@ -49,7 +49,11 @@ where
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
     /// Creates a new prover channel for the specified `air` and public inputs.
-    pub fn new(airs: &'a Vec<A>, mut pub_inputs_elements_vec: Vec<Vec<A::BaseField>>) -> Self {
+    pub fn new(
+        n: usize,
+        airs: &'a Vec<A>,
+        mut pub_inputs_elements_vec: Vec<Vec<A::BaseField>>,
+    ) -> Self {
         assert_eq!(
             n,
             airs.len(),

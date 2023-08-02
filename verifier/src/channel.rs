@@ -46,7 +46,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     // --------------------------------------------------------------------------------------------
     /// Creates and returns a new [VerifierChannel] initialized from the specified `proof`.
     pub fn new<A: Air<BaseField = E::BaseField>>(
-        airs: Vec<&A>,
+        airs: &Vec<A>,
         proof: StarkProof,
     ) -> Result<Self, VerifierError> {
         let StarkProof {
@@ -95,7 +95,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
         // --- parse trace and constraint queries -------------------------------------------------
         let trace_queries = TraceQueries::new(trace_queries, airs)?;
         //println!("Trace_queiries from verifier{:?}", trace_queries);
-        let constraint_queries = ConstraintQueries::new(constraint_queries, airs[0])?;
+        let constraint_queries = ConstraintQueries::new(constraint_queries, &airs[0])?;
 
         // --- parse FRI proofs -------------------------------------------------------------------
         let fri_num_partitions = fri_proof.num_partitions();
@@ -143,7 +143,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             // out-of-domain evaluation
             ood_traces_frame: ood_traces_frame
                 .iter()
-                .map(|ood_trace_frame| Some(*ood_trace_frame))
+                .map(|ood_trace_frame| Some(ood_trace_frame))
                 .collect(),
             ood_constraint_evaluations: Some(ood_constraints_evaluations[0]),
             // query seed
@@ -296,7 +296,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
     /// corresponding Merkle authentication paths.
     pub fn new<A: Air<BaseField = E::BaseField>>(
         mut queries: Vec<JointTraceQueries>,
-        airs: Vec<&A>,
+        airs: &Vec<A>,
     ) -> Result<Self, VerifierError> {
         /*for air in airs.iter() {
             assert_eq!(

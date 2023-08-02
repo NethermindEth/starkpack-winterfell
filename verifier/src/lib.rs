@@ -101,8 +101,8 @@ where
     //let airs = pub_inputs_vec.iter().enumerate().
     //map(|(i,&pub_inputs)|AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).clone())).collect();
     let mut airs = Vec::new();
-    for (i,&pub_inputs) in pub_inputs_vec.iter().enumerate(){
-        airs.push(&AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).clone()));
+    for (i,pub_inputs) in pub_inputs_vec.iter().enumerate(){
+        airs.push(AIR::new(proof.get_trace_info(i), *pub_inputs, proof.options(i).clone()));
     }
 
     // figure out which version of the generic proof verification procedure to run. this is a sort
@@ -110,10 +110,10 @@ where
     match airs[0].options().field_extension() {
         FieldExtension::None => {
             let public_coin = RandCoin::new(&public_coin_seed);
-            match VerifierChannel::new(airs, proof) {
+            match VerifierChannel::new(&airs, proof) {
                 Ok(channel) => {
                     println!("Verifier channel creation successful");
-                    perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(airs, channel, public_coin)
+                    perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(&airs, channel, public_coin)
                 },
                 Err(err) => {
                     println!("Verifier channel creation failed");
@@ -127,16 +127,17 @@ where
                 return Err(VerifierError::UnsupportedFieldExtension(2));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(airs, proof)?;
-            perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(airs, channel, public_coin)
+            let channel = VerifierChannel::new(&airs, proof)?;
+            perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(&airs, channel, public_coin)
         },
         FieldExtension::Cubic => {
             if !<CubeExtension<AIR::BaseField>>::is_supported() {
                 return Err(VerifierError::UnsupportedFieldExtension(3));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(airs, proof)?;
-            perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(airs, channel, public_coin)
+            let channel = VerifierChannel::new(&
+                airs, proof)?;
+            perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(&airs, channel, public_coin)
         },
     }
 }
@@ -146,7 +147,7 @@ where
 /// Performs the actual verification by reading the data from the `channel` and making sure it
 /// attests to a correct execution of the computation specified by the provided `air`.
 fn perform_verification<A, E, H, R>(
-    airs: Vec<&A>,
+    airs: &Vec<A>,
     mut channel: VerifierChannel<E, H>,
     mut public_coin: R,
 ) -> Result<(), VerifierError>
@@ -260,8 +261,8 @@ where
     // interactive version of the protocol, the verifier sends these coefficients to the prover
     // and the prover uses them to compute the DEEP composition polynomial. the prover, then
     // applies FRI protocol to the evaluations of the DEEP composition polynomial.
-    let deep_coefficients = airs[0]
-        .get_deep_composition_coefficients::<A, E, R>(&airs, &mut public_coin)
+    let deep_coefficients: DeepCompositionCoefficients<E> = airs[0]
+        .get_deep_composition_coefficients::<A, E, R>(airs, &mut public_coin)
         .map_err(|_| VerifierError::RandomCoinError)?;
 
     // instantiates a FRI verifier with the FRI layer commitments read from the channel. From the

@@ -222,6 +222,7 @@ pub trait Prover {
         // verifier; the channel will be used to commit to values and to draw randomness that
         // should come from the verifier.
         let mut channel = ProverChannel::<Self::Air, E, Self::HashFn, Self::RandomCoin>::new(
+            n,
             &airs,
             pub_inputs_elements_vec,
         );
@@ -249,8 +250,7 @@ pub trait Prover {
         );
 
         // extend the main execution trace and build a Merkle tree from the extended trace
-        let traces_main_segment: Vec<_> =
-            traces.iter().map(|trace| *trace.main_segment()).collect();
+        let traces_main_segment: Vec<_> = traces.iter().map(|trace| trace.main_segment()).collect();
         let (main_traces_lde, main_trace_tree, main_traces_polys) =
             self.build_trace_commitment::<Self::BaseField>(traces_main_segment, &domain);
 
@@ -275,9 +275,9 @@ pub trait Prover {
             .map(|_| domain.trace_to_lde_blowup())
             .collect();
         let mut trace_commitment = TraceCommitment::new(main_traces_lde, main_trace_tree, blowups);
-        let traces_polys = main_traces_polys
+        let traces_polys: Vec<_> = main_traces_polys
             .iter()
-            .map(|main_trace_polys| TracePolyTable::new(main_trace_polys))
+            .map(|&main_trace_polys| TracePolyTable::new(main_trace_polys))
             .collect();
 
         // build auxiliary trace segments (if any), and append the resulting segments to trace
@@ -310,7 +310,7 @@ pub trait Prover {
                 );
                 aux_traces_segments.push(aux_trace_segments);
                 aux_traces_rand_elements.push(aux_trace_rand_elements);
-                aux_segments.push(aux_segment);
+                aux_segments.push(&aux_segment);
             }
             // extend the auxiliary trace segment and build a Merkle tree from the extended trace
             let (aux_segments_lde, aux_segment_tree, aux_segments_polys) =
@@ -331,7 +331,7 @@ pub trait Prover {
 
                 trace_polys.add_aux_segment(aux_segments_polys[i]);
                 aux_traces_rand_elements[i].add_segment_elements(rand_elements_vec[i]);
-                aux_traces_segments[i].push(aux_segments[i]);
+                aux_traces_segments[i].push(*aux_segments[i]);
             }
         }
 
@@ -441,10 +441,11 @@ pub trait Prover {
         // evaluate trace and constraint polynomials at the OOD point z, and send the results to
         // the verifier. the trace polynomials are actually evaluated over two points: z and z * g,
         // where g is the generator of the trace domain.
-        let ood_traces_states = traces_polys
+        let ood_traces_states: Vec<&[Vec<E>]> = traces_polys
             .iter()
-            .map(|&trace_polys| trace_polys.get_ood_frame(z));
-        channel.send_ood_trace_states(&ood_traces_states);
+            .map(|&trace_polys| trace_polys.get_ood_frame(z))
+            .collect();
+        channel.send_ood_trace_states(ood_traces_states);
 
         //let ood_evaluations = composition_poly.evaluate_at(z);
         let ood_evaluations = final_poly.evaluate_at(z);
