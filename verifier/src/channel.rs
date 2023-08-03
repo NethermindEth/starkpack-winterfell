@@ -110,8 +110,8 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
         let mut ood_traces_evaluations = Vec::new();
         let mut ood_constraints_evaluations = Vec::new();
         let mut ood_traces_frame = Vec::new();
-        for (i, &ood_frame) in ood_frames.iter().enumerate() {
-            let (ood_trace_evaluations, ood_constraint_evaluations) = ood_frame
+        for (i, ood_frame) in ood_frames.iter().enumerate() {
+            let (ood_trace_evaluations, ood_constraint_evaluations) = &ood_frame
                 .parse(
                     main_traces_width[i],
                     aux_traces_width[i],
@@ -119,7 +119,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
                 )
                 .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
             let ood_trace_frame = TraceOodFrame::new(
-                ood_trace_evaluations,
+                *ood_trace_evaluations,
                 main_traces_width[i],
                 aux_traces_width[i],
             );
