@@ -111,7 +111,8 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
         let mut ood_constraints_evaluations = Vec::new();
         let mut ood_traces_frame = Vec::new();
         for (i, ood_frame) in ood_frames.iter().enumerate() {
-            let (ood_trace_evaluations, ood_constraint_evaluations) = &ood_frame
+            let (ood_trace_evaluations, ood_constraint_evaluations) = ood_frame
+                .to_owned()
                 .parse(
                     main_traces_width[i],
                     aux_traces_width[i],
@@ -119,13 +120,13 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
                 )
                 .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
             let ood_trace_frame = TraceOodFrame::new(
-                *ood_trace_evaluations,
+                ood_trace_evaluations.to_owned(),
                 main_traces_width[i],
                 aux_traces_width[i],
             );
             ood_traces_evaluations.push(ood_trace_evaluations);
             ood_constraints_evaluations.push(ood_constraint_evaluations);
-            ood_traces_frame.push(ood_trace_frame);
+            ood_traces_frame.push(Some(ood_trace_frame));
         }
         Ok(VerifierChannel {
             // trace queries
@@ -141,11 +142,8 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             fri_remainder: Some(fri_remainder),
             fri_num_partitions,
             // out-of-domain evaluation
-            ood_traces_frame: ood_traces_frame
-                .iter()
-                .map(|&ood_trace_frame| Some(ood_trace_frame))
-                .collect(),
-            ood_constraint_evaluations: Some(ood_constraints_evaluations[0]),
+            ood_traces_frame,
+            ood_constraint_evaluations: Some(ood_constraints_evaluations[0].to_vec()),
             // query seed
             pow_nonce,
         })
@@ -173,11 +171,17 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     /// For computations requiring multiple trace segments, evaluations of auxiliary trace
     /// polynomials are also included.
     pub fn read_ood_traces_frame(&mut self) -> Vec<TraceOodFrame<E>> {
-        let traces_ood_frame = self
+        // Leaving this code here because I fear the filter map might not be quite what we want
+        // so it is nice to try it and see if the proof holds
+        /* let traces_ood_frame = self
             .ood_traces_frame
             .iter()
-            .map(|ood_trace_frame| ood_trace_frame.take().expect("already read"))
-            .collect();
+            .map(|ood_trace_frame| {
+                let mut ood_trace_frame_mutable = ood_trace_frame.to_owned();
+                ood_trace_frame_mutable.take().expect("already read")
+            })
+            .collect(); */
+        let traces_ood_frame = self.ood_traces_frame.iter().filter_map(|x| x.as_ref()).cloned().collect();
         traces_ood_frame
     }
 
