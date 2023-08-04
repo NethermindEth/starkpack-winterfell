@@ -59,8 +59,6 @@ impl<E: FieldElement> DeepComposer<E> {
         ood_main_frames: Vec<EvaluationFrame<E>>,
         ood_aux_frames: Vec<Option<EvaluationFrame<E>>>,
     ) -> Vec<E> {
-        let ood_main_trace_states = [ood_main_frames[0].current(), ood_main_frames[0].next()];
-
         // compose columns of of the main trace segment; we do this separately for numerators of
         // each query; we also track common denominator for each query separately; this way we can
         // use a batch inversion in the end.

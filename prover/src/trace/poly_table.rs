@@ -44,7 +44,7 @@ impl<E: FieldElement> TracePolyTable<E> {
             aux_segment_polys.num_rows(),
             "polynomials in auxiliary segment must be of the same size as in the main segment"
         );
-        self.aux_segment_polys.push(aux_segment_polys);
+        self.aux_segment_polys.push(aux_segment_polys.to_owned());
     }
 
     // PUBLIC ACCESSORS

@@ -107,7 +107,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
 
         // --- parse out-of-domain evaluation frame -----------------------------------------------
-        let mut ood_traces_evaluations = Vec::new();
+        //let mut ood_traces_evaluations = Vec::new();
         let mut ood_constraints_evaluations = Vec::new();
         let mut ood_traces_frame = Vec::new();
         for (i, ood_frame) in ood_frames.iter().enumerate() {
@@ -124,7 +124,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
                 main_traces_width[i],
                 aux_traces_width[i],
             );
-            ood_traces_evaluations.push(ood_trace_evaluations);
+            //ood_traces_evaluations.push(ood_trace_evaluations);
             ood_constraints_evaluations.push(ood_constraint_evaluations);
             ood_traces_frame.push(Some(ood_trace_frame));
         }
@@ -174,14 +174,19 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
         // Leaving this code here because I fear the filter map might not be quite what we want
         // so it is nice to try it and see if the proof holds
         /* let traces_ood_frame = self
+        .ood_traces_frame
+        .iter()
+        .map(|ood_trace_frame| {
+            let mut ood_trace_frame_mutable = ood_trace_frame.to_owned();
+            ood_trace_frame_mutable.take().expect("already read")
+        })
+        .collect(); */
+        let traces_ood_frame = self
             .ood_traces_frame
             .iter()
-            .map(|ood_trace_frame| {
-                let mut ood_trace_frame_mutable = ood_trace_frame.to_owned();
-                ood_trace_frame_mutable.take().expect("already read")
-            })
-            .collect(); */
-        let traces_ood_frame = self.ood_traces_frame.iter().filter_map(|x| x.as_ref()).cloned().collect();
+            .filter_map(|x| x.as_ref())
+            .cloned()
+            .collect();
         traces_ood_frame
     }
 
@@ -341,7 +346,8 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
         // single table; parsing also validates that hashes of each table row form the leaves
         // of Merkle authentication paths in the proofs
         let aux_traces_states = if airs[0].trace_info().is_multi_segment() {
-            let mut aux_traces_states = Vec::new();
+            let mut aux_trace_states = Vec::new();
+            let n = main_segments_states.len();
             for (i, segment_queries) in queries.into_iter().enumerate() {
                 let aux_segments_width = airs
                     .iter()
@@ -357,14 +363,29 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
                         })?;
 
                 query_proofs.push(segment_query_proof);
-                aux_traces_states.push(segment_traces_states);
+                aux_trace_states.push(segment_traces_states);
             }
 
             // merge tables for each auxiliary segment into a single table
-            aux_traces_states
-                .iter()
-                .map(|aux_trace_states| Some(Table::merge(*aux_trace_states)))
-                .collect()
+
+            //This may look extremly odd so here is an explanation
+            //Let's denote n = {The number of traces in starkpack}
+            //m = {The number of aux_segments in each trace}(We assume that the number of segmets is equall for each trace)
+            //The original Winterfell would iterate over m (line351) get the segments and merge them into one table.
+            //In our case during the each iteration we get not 1 segment but a pack of n segments
+            // so a matrix of size m*n
+            //but we need a matrix of size n*m
+            //that's why I rearrange the matrix m*n-> n*m
+            //And merge each row into a table.
+            let mut aux_traces_states = Vec::new();
+            for i in 0..n {
+                let mut aux_table_states = Vec::new();
+                for segment_traces_states in aux_trace_states.iter() {
+                    aux_table_states.push(segment_traces_states[i].to_owned());
+                }
+                aux_traces_states.push(Table::merge(aux_table_states))
+            }
+            Some(aux_traces_states)
         } else {
             None
         };

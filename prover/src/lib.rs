@@ -296,9 +296,10 @@ pub trait Prover {
                 rand_elements_vec.push(rand_elements);
                 //println!("The random elements of the Prover,{:?}", rand_elements_vec);
                 // build the trace segment
-                let mut aux_trace_segments = Vec::new();
-                let mut aux_trace_rand_elements = AuxTraceRandElements::new();
+                let aux_trace_segments = Vec::new();
+                let aux_trace_rand_elements = AuxTraceRandElements::new();
                 let aux_segment = trace
+                    .to_owned()
                     .build_aux_segment(&aux_trace_segments, &rand_elements)
                     .expect("failed build auxiliary trace segment");
                 #[cfg(feature = "std")]
@@ -327,11 +328,12 @@ pub trait Prover {
 
             for (i, trace_polys) in traces_polys.iter().enumerate() {
                 // append the segment to the trace commitment and trace polynomial table structs
-                trace_commitment.add_segment(aux_segments_lde[i], aux_segment_tree);
+                trace_commitment
+                    .add_segment(aux_segments_lde[i].to_owned(), aux_segment_tree.to_owned());
 
-                trace_polys.add_aux_segment(aux_segments_polys[i]);
+                trace_polys.add_aux_segment(&aux_segments_polys[i].to_owned());
                 aux_traces_rand_elements[i].add_segment_elements(rand_elements_vec[i]);
-                aux_traces_segments[i].push(*aux_segments[i]);
+                aux_traces_segments[i].push(aux_segments[i].to_owned());
             }
         }
 
