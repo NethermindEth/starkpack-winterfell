@@ -27,6 +27,7 @@ fn main() {
     }
     // Public inputs for our computation will consist of the starting value and the end result.
 
+    #[derive(Clone, Copy)]
     pub struct PublicInputs {
         start: BaseElement,
         result: BaseElement,

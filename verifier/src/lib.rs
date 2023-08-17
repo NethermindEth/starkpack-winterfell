@@ -98,12 +98,7 @@ where
     }
     
     // create AIR instance for the computation specified in the proof
-    //let airs = pub_inputs_vec.iter().enumerate().
-    //map(|(i,&pub_inputs)|AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).clone())).collect();
-    let mut airs = Vec::new();
-    for (i,pub_inputs) in pub_inputs_vec.iter().enumerate(){
-        airs.push(AIR::new(proof.get_trace_info(i), *pub_inputs, proof.options(i).clone()));
-    }
+    let airs: Vec<_> = pub_inputs_vec.into_iter().enumerate().map(|(i, pub_inputs)| AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).to_owned())).collect();
 
     // figure out which version of the generic proof verification procedure to run. this is a sort
     // of static dispatch for selecting two generic parameter: extension field and hash function.

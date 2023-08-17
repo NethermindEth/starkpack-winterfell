@@ -102,8 +102,10 @@ impl<E: FieldElement> DeepComposer<E> {
 
             // if the trace has auxiliary segments, compose columns from these segments as well; we
             // also do this separately for numerators and denominators.
-            if let Some(queried_aux_trace_states) = queried_aux_traces_states {
-                let ood_aux_frame = ood_aux_frames[index].expect("missing auxiliary OOD frame");
+            if let Some(queried_aux_trace_states) = queried_aux_traces_states.clone() {
+                let ood_aux_frame = ood_aux_frames[index]
+                    .as_ref()
+                    .expect("missing auxiliary OOD frame");
                 let ood_aux_trace_states = [ood_aux_frame.current(), ood_aux_frame.next()];
 
                 // we define this offset here because composition of the main trace columns has
@@ -138,7 +140,7 @@ impl<E: FieldElement> DeepComposer<E> {
             results_num.push(result_num);
             results_den.push(result_den);
         }
-        let first_num = results_num[0];
+        let first_num = results_num[0].clone();
         let rem_results: Vec<_> = results_num.iter().skip(1).collect();
         let final_num = rem_results
             .into_iter()

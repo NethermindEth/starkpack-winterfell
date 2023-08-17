@@ -215,9 +215,17 @@ impl<E: FieldElement> RowMatrix<E> {
             128, // min batch size
             |batch: &mut [H::Digest], batch_offset: usize| {
                 for (i, row_hash) in batch.iter_mut().enumerate() {
-                    let traces_row: Vec<_> = traces_lde.iter().skip(1).map(|trace_lde| trace_lde.row(batch_offset + i)).collect();
+                    let traces_row: Vec<_> = traces_lde
+                        .iter()
+                        .skip(1)
+                        .map(|trace_lde| trace_lde.row(batch_offset + i))
+                        .collect();
                     let trace_row = self.row(batch_offset + i);
-                    let comb_rows = traces_row.into_iter().fold(trace_row, |acc, next_trace_row| &[acc, next_trace_row].concat());
+                    let comb_rows = traces_row
+                        .into_iter()
+                        .fold(trace_row, |acc, next_trace_row| {
+                            &[acc, next_trace_row].concat()
+                        });
                     *row_hash = H::hash_elements(&comb_rows);
                 }
             }
