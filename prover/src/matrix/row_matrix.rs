@@ -221,11 +221,10 @@ impl<E: FieldElement> RowMatrix<E> {
                         .map(|trace_lde| trace_lde.row(batch_offset + i))
                         .collect();
                     let trace_row = self.row(batch_offset + i);
-                    let comb_rows = traces_row
-                        .into_iter()
-                        .fold(trace_row, |acc, next_trace_row| {
-                            &[acc, next_trace_row].concat()
-                        });
+                    let mut comb_rows = trace_row.to_vec();
+                    for next_trace_row in traces_row {
+                        comb_rows.extend_from_slice(next_trace_row);
+                    }
                     *row_hash = H::hash_elements(&comb_rows);
                 }
             }

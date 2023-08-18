@@ -138,8 +138,8 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
             );
             trace_poly_vec.push(trace_poly);
         }
-        let mut first_poly = trace_poly_vec[0];
-        let rem_polys: Vec<_> = trace_poly_vec.iter().skip(1).collect();
+        let first_poly = trace_poly_vec.first().unwrap().to_owned();
+        // let rem_polys: Vec<_> = trace_poly_vec.iter().skip(1).collect();
         let final_trace_poly = trace_poly_vec
             .into_iter()
             .fold(first_poly, |mut acc, next_poly| {

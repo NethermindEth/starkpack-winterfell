@@ -44,9 +44,9 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
             "number of rows in trace LDE must be the same as number of leaves in trace commitment"
         );
         let traces_lde = main_traces_lde
-            .iter()
+            .into_iter()
             .zip(blowups)
-            .map(|(&main_trace_lde, blowup)| TraceLde::new(main_trace_lde, blowup))
+            .map(|(main_trace_lde, blowup)| TraceLde::new(main_trace_lde, blowup))
             .collect();
         Self {
             traces_lde,
@@ -65,9 +65,9 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
             aux_segment_tree.leaves().len(),
             "number of rows in trace LDE must be the same as number of leaves in trace commitment"
         );
-        for mut trace_lde in self.traces_lde {
-            trace_lde.add_aux_segment(aux_segment_lde);
-            self.aux_segment_trees.push(aux_segment_tree);
+        for mut trace_lde in self.traces_lde.clone() {
+            trace_lde.add_aux_segment(aux_segment_lde.clone());
+            self.aux_segment_trees.push(aux_segment_tree.clone());
         }
     }
 
@@ -151,8 +151,18 @@ where
             .collect::<Vec<_>>();
         traces_states.push(trace_states);
     }
-    let first_states = traces_states[0];
-    let mut comb_states = Vec::with_capacity(first_states.len());
+    let first_states = traces_states.first().unwrap().to_owned();
+    let comb_states = first_states.into_iter().enumerate()
+        .map(|(i, row)| {
+            traces_states[1..].iter().fold(row, |acc, next_trace_states| {
+                let next_trace_row = next_trace_states.iter().nth(i).unwrap().to_owned();
+                let result = [acc, next_trace_row].concat();
+                result
+            })
+        }).collect();
+
+    // Leaving this code here for checking
+    /* let mut comb_states = Vec::with_capacity(first_states.len());
     let rem_traces_states: Vec<_> = traces_states.iter().skip(1).collect();
     for (i, row) in first_states.iter().enumerate() {
         let trace_row = row[..].to_vec();
@@ -165,7 +175,7 @@ where
                 }),
         );
     }
-    // build Merkle authentication paths to the leaves specified by positions
+    // build Merkle authentication paths to the leaves specified by positions */
     let trace_proof = segment_tree
         .prove_batch(positions)
         .expect("failed to generate a Merkle proof for trace queries");
