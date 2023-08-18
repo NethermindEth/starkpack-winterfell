@@ -72,8 +72,9 @@ where
         // build a seed for the public coin; the initial seed is a hash of the proof context and
         // the public inputs, but as the protocol progresses, the coin will be reseeded with the
         // info sent to the verifier
-        let mut coin_seed_elements = contexts[0].to_elements();
-        for mut pub_inputs_elements in pub_inputs_elements_vec.iter() {
+        let mut coin_seed_elements: Vec<<A as Air>::BaseField> =
+            contexts.first().unwrap().to_elements();
+        for mut pub_inputs_elements in pub_inputs_elements_vec.to_owned() {
             coin_seed_elements.append(&mut pub_inputs_elements);
         }
 
@@ -107,8 +108,12 @@ where
     /// Saves the evaluations of trace polynomials over the out-of-domain evaluation frame. This
     /// also reseeds the public coin with the hashes of the evaluation frame states.
     pub fn send_ood_trace_states(&mut self, trace_states_vec: Vec<&[Vec<E>]>) {
-        for (trace_states, ood_frame) in trace_states_vec.iter().zip(self.ood_frames.iter()) {
-            let result = ood_frame.set_trace_states(trace_states);
+        let ood_frames = &mut self.ood_frames.to_owned();
+        let results = trace_states_vec
+            .iter()
+            .zip(ood_frames.iter_mut())
+            .map(|(trace_states, ood_frame)| ood_frame.set_trace_states(trace_states));
+        for result in results {
             self.public_coin.reseed(H::hash_elements(&result));
         }
     }
@@ -116,7 +121,7 @@ where
     /// Saves the evaluations of constraint composition polynomial columns at the out-of-domain
     /// point. This also reseeds the public coin wit the hash of the evaluations.
     pub fn send_ood_constraint_evaluations(&mut self, evaluations: &[E]) {
-        for ood_frame in self.ood_frames.iter() {
+        for ood_frame in self.ood_frames.iter_mut() {
             ood_frame.set_constraint_evaluations(evaluations);
         }
         self.public_coin.reseed(H::hash_elements(evaluations));
