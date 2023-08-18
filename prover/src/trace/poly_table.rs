@@ -18,6 +18,7 @@ use utils::collections::Vec;
 /// Coefficients of the polynomials for the main trace segment are always in the base field.
 /// However, coefficients of the polynomials for the auxiliary trace segments may be either in the
 /// base field, or in the extension field, depending on whether extension field is being used.
+#[derive(Clone)]
 pub struct TracePolyTable<E: FieldElement> {
     main_segment_polys: ColMatrix<E::BaseField>,
     aux_segment_polys: Vec<ColMatrix<E>>,
