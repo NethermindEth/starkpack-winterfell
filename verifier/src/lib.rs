@@ -216,17 +216,18 @@ where
         .iter()
         .map(|ood_trace_frame| ood_trace_frame.aux_frame())
         .collect();
-    for (i, ood_trace_frame) in ood_traces_frame.iter().enumerate() {
-        let ood_aux_trace_frame = ood_trace_frame.aux_frame();
+    for i in 0..ood_traces_frame.len() {
+        let constraints_coeffs_i = &constraints_coeffs[i];
+        let aux_trace_rand_elements_i = &aux_traces_rand_elements[i];
         let ood_constraint_evaluation_1 = evaluate_constraints(
             &airs[i],
-            constraints_coeffs[i],
+            constraints_coeffs_i.to_owned(),
             &ood_main_traces_frame[i],
             &ood_aux_traces_frame[i],
-            aux_traces_rand_elements[i],
+            aux_trace_rand_elements_i.to_owned(),
             z,
         );
-        public_coin.reseed(H::hash_elements(ood_trace_frame.values()));
+        public_coin.reseed(H::hash_elements(ood_traces_frame[i].values()));
         ood_constraint_evaluation += ood_constraint_evaluation_1;
     }
 

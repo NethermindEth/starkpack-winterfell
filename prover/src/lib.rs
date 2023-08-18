@@ -194,7 +194,7 @@ pub trait Prover {
     fn generate_proof<E>(
         &self,
         n: usize,
-        mut traces: Vec<Self::Trace>,
+        traces: Vec<Self::Trace>,
     ) -> Result<StarkProof, ProverError>
     where
         E: FieldElement<BaseField = Self::BaseField>,
@@ -202,8 +202,8 @@ pub trait Prover {
         // 0 ----- instantiate AIR and prover channel ---------------------------------------------
 
         // serialize public inputs; these will be included in the seed for the public coin
-        let pub_inputs_vec = traces.iter().map(|trace| self.get_pub_inputs(trace));
-        let pub_inputs_elements_vec = pub_inputs_vec
+        let pub_inputs_vec: Vec<_> = traces.iter().map(|trace| self.get_pub_inputs(trace)).collect();
+        let pub_inputs_elements_vec = pub_inputs_vec.iter()
             .map(|pub_inputs| pub_inputs.to_elements())
             .collect();
 
@@ -236,11 +236,11 @@ pub trait Prover {
         let now = Instant::now();
         // Keep in mind that here the traces are identitical so only having one domain is fine for
         // now
-        let Some((greatest_domain_index, _)) = airs
+        let (greatest_domain_index, _) = airs
             .iter()
             .map(|air| air.trace_length())
             .enumerate()
-            .max_by_key(|(index, _)| index);
+            .max_by_key(|(index, _)| index).expect("Could not obtain the largest domain from Airs");
         let domain = StarkDomain::new(&airs[greatest_domain_index]);
         #[cfg(feature = "std")]
         debug!(
