@@ -101,13 +101,14 @@ fn main() {
         }
     }
 
-    let starting_vec = (3..4).map(|i| BaseElement::new(i)).collect();
-    let n = 1024;
+    let starting_vec: Vec<_> = (0..2_u128.pow(4)).map(|i| BaseElement::new(i)).collect();
+    let n = starting_vec.len();
     // Build the execution trace and get the result from the last step.
-    let traces = starting_vec
-        .map(|start| build_do_work_trace(start, n))
+    let traces: Vec<_> = starting_vec
+        .iter()
+        .map(|&start| build_do_work_trace(start, n))
         .collect();
-    let results = traces.map(|trace| trace.get(0, n - 1)).collect();
+    let results: Vec<_> = traces.iter().map(|trace| trace.get(0, n - 1)).collect();
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(
         32, // number of queries
@@ -119,13 +120,13 @@ fn main() {
     );
     // Instantiate the prover and generate the proof.
     let prover = WorkProver::new(options);
-    let proof = prover.prove(2, traces).unwrap();
+    let proof = prover.prove(n, traces).unwrap();
     // Verify the proof. The number of steps and options are encoded in the proof itself,
     // so we don't need to pass them explicitly to the verifier.
     let pub_inputs_vec = starting_vec
-        .into()
-        .zip(results.iter())
-        .map(|(start, result)| PublicInputs { start, result });
+        .into_iter()
+        .zip(results.into_iter())
+        .map(|(start, result)| PublicInputs { start, result }).collect();
     match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
         proof,
         pub_inputs_vec,
