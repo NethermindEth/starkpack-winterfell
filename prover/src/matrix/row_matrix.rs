@@ -223,7 +223,10 @@ impl<E: FieldElement> RowMatrix<E> {
                     let trace_row = self.row(batch_offset + i);
                     let mut comb_rows = trace_row.to_vec();
                     for next_trace_row in traces_row {
-                        comb_rows.extend_from_slice(next_trace_row);
+                        let next_trace_row_vec = next_trace_row.to_vec();
+                        // comb_rows.extend_from_slice(next_trace_row);
+                        comb_rows = [comb_rows.to_owned(), next_trace_row_vec].concat();
+                        // TODO^: Check if is best to concat or creating a vector
                     }
                     *row_hash = H::hash_elements(&comb_rows);
                 }

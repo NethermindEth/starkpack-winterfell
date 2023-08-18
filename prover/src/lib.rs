@@ -210,6 +210,7 @@ pub trait Prover {
             .iter()
             .map(|pub_inputs| pub_inputs.to_elements())
             .collect();
+        println!("#traces: {}", traces.len());
 
         // create an instance of AIR for the provided parameters. this takes a generic description
         // of the computation (provided via AIR type), and creates a description of a specific

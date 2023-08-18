@@ -54,6 +54,8 @@ where
         airs: &'a Vec<A>,
         mut pub_inputs_elements_vec: Vec<Vec<A::BaseField>>,
     ) -> Self {
+        println!("n: {}", n);
+        println!("airs.len(): {}", airs.len());
         assert_eq!(
             n,
             airs.len(),

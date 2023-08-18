@@ -154,8 +154,10 @@ where
     let first_states = traces_states.first().unwrap().to_owned();
     let comb_states = first_states.into_iter().enumerate()
         .map(|(i, row)| {
-            traces_states[1..].iter().fold(row, |acc, next_trace_states| {
+            traces_states[1..].iter().fold(row, |mut acc, next_trace_states| {
                 let next_trace_row = next_trace_states.iter().nth(i).unwrap().to_owned();
+                // let result = acc.extend_from_slice(next_trace_row.as_slice());
+                // TODO^ Check why is extend not working
                 let result = [acc, next_trace_row].concat();
                 result
             })

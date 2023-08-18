@@ -139,8 +139,8 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
             trace_poly_vec.push(trace_poly);
         }
         let first_poly = trace_poly_vec.first().unwrap().to_owned();
-        // let rem_polys: Vec<_> = trace_poly_vec.iter().skip(1).collect();
-        let final_trace_poly = trace_poly_vec
+        let rem_polys: Vec<_> = trace_poly_vec.iter().skip(1).collect();
+        let final_trace_poly = rem_polys
             .into_iter()
             .fold(first_poly, |mut acc, next_poly| {
                 add_in_place(&mut acc, &next_poly);
@@ -148,6 +148,7 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
             });
         // set the coefficients of the DEEP composition polynomial
         self.coefficients = final_trace_poly;
+        // TODO^ Check again here
         assert_eq!(self.poly_size() - 2, self.degree());
     }
 
