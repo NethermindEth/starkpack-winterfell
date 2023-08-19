@@ -102,13 +102,14 @@ fn main() {
     }
 
     let starting_vec: Vec<_> = (0..2_u128.pow(4)).map(|i| BaseElement::new(i)).collect();
+    let m = 1024;
     let n = starting_vec.len();
     // Build the execution trace and get the result from the last step.
     let traces: Vec<_> = starting_vec
         .iter()
-        .map(|&start| build_do_work_trace(start, n))
+        .map(|&start| build_do_work_trace(start, m))
         .collect();
-    let results: Vec<_> = traces.iter().map(|trace| trace.get(0, n - 1)).collect();
+    let results: Vec<_> = traces.iter().map(|trace| trace.get(0, m - 1)).collect();
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(
         32, // number of queries
@@ -126,7 +127,8 @@ fn main() {
     let pub_inputs_vec = starting_vec
         .into_iter()
         .zip(results.into_iter())
-        .map(|(start, result)| PublicInputs { start, result }).collect();
+        .map(|(start, result)| PublicInputs { start, result })
+        .collect();
     match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
         proof,
         pub_inputs_vec,
