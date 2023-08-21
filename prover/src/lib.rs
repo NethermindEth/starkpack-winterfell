@@ -179,7 +179,7 @@ pub trait Prover {
                 if !<CubeExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(3));
                 }
-                self.generate_proof::<QuadExtension<Self::BaseField>>(n, traces)
+                self.generate_proof::<CubeExtension<Self::BaseField>>(n, traces)
             }
         }
     }
@@ -373,7 +373,9 @@ pub trait Prover {
                 trace_commitment
                     .add_segment(aux_segments_lde[i].to_owned(), aux_segment_tree.to_owned());
 
-                trace_polys.to_owned().add_aux_segment(&aux_segments_polys[i].to_owned());
+                trace_polys
+                    .to_owned()
+                    .add_aux_segment(&aux_segments_polys[i].to_owned());
                 aux_traces_rand_elements[i].add_segment_elements(rand_elements_vec[i].to_owned());
                 aux_traces_segments[i].push(aux_segments[i].to_owned());
             }
@@ -382,13 +384,26 @@ pub trait Prover {
         // make sure the specified trace (including auxiliary segments) is valid against the AIR.
         // This checks validity of both, assertions and state transitions. We do this in debug
         // mode only because this is a very expensive operation.
+        println!(
+            "aux_traces_segments length is {:?}",
+            aux_traces_segments.len()
+        );
+        println!(
+            "aux_traces_rand_elements length is {:?}",
+            aux_traces_rand_elements.len()
+        );
         #[cfg(debug_assertions)]
         for (i, trace) in traces.iter().enumerate() {
-            trace.validate(
-                &airs[i],
-                &aux_traces_segments[i],
-                &aux_traces_rand_elements[i],
-            );
+            if let Some(aux_trace_segments) = aux_traces_segments.iter().nth(i).unwrap() {
+                trace.validate(
+                    &airs[i],
+                    &aux_trace_segments,
+                    &aux_traces_rand_elements.iter().nth(i).unwrap(),
+                );
+            } else {
+                trace.validate(&airs[i], &vec![], &vec![vec![]]);
+            }
+            //println!("this works!");
         }
 
         // 2 ----- evaluate constraints -----------------------------------------------------------
@@ -406,8 +421,11 @@ pub trait Prover {
         for (i, air) in airs.iter().enumerate() {
             let constraint_coeffs = channel.get_constraint_composition_coeffs();
             constraint_coeffs_vec.push(constraint_coeffs.clone());
-            let evaluator =
-                ConstraintEvaluator::new(air, aux_traces_rand_elements[i].clone(), constraint_coeffs);
+            let evaluator = ConstraintEvaluator::new(
+                air,
+                aux_traces_rand_elements[i].clone(),
+                constraint_coeffs,
+            );
             //evaluator_vec.push(evaluator);
             let constraint_evaluations =
                 evaluator.evaluate(trace_commitment.trace_table(i), &domain);
@@ -627,7 +645,10 @@ pub trait Prover {
             .iter()
             .map(|trace| trace.interpolate_columns())
             .collect();
-        let traces_polys: Vec<_> = traces_polys_owned.iter().map(|trace_polys| trace_polys).collect();
+        let traces_polys: Vec<_> = traces_polys_owned
+            .iter()
+            .map(|trace_polys| trace_polys)
+            .collect();
         let traces_lde: Vec<_> = traces_polys
             .iter()
             .map(|trace_polys| {
