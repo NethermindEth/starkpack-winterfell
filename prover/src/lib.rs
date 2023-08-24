@@ -384,26 +384,38 @@ pub trait Prover {
         // make sure the specified trace (including auxiliary segments) is valid against the AIR.
         // This checks validity of both, assertions and state transitions. We do this in debug
         // mode only because this is a very expensive operation.
-        println!(
-            "aux_traces_segments length is {:?}",
-            aux_traces_segments.len()
-        );
-        println!(
-            "aux_traces_rand_elements length is {:?}",
-            aux_traces_rand_elements.len()
-        );
         #[cfg(debug_assertions)]
-        for (i, trace) in traces.iter().enumerate() {
-            if let Some(aux_trace_segments) = aux_traces_segments.iter().nth(i).unwrap() {
+        /* for (i, trace) in traces.iter().enumerate() {
+            if let Some(aux_trace_segments) = aux_traces_segments.iter().nth(i) {
+                println!("Some or none?");
                 trace.validate(
                     &airs[i],
                     &aux_trace_segments,
                     &aux_traces_rand_elements.iter().nth(i).unwrap(),
                 );
             } else {
-                trace.validate(&airs[i], &vec![], &vec![vec![]]);
+                let empty_rand = AuxTraceRandElements::<E>::new();
+                trace.validate(&airs[i], &vec![], &empty_rand);
             }
             //println!("this works!");
+        } */
+        for (i, trace) in traces.iter().enumerate() {
+            println!("airs lenght: {}", airs.len());
+            println!("aux_trace_seg lenght: {}", aux_traces_segments.len());
+            println!("aux_rand lenght: {}", aux_traces_rand_elements.len());
+            if let Some((aux_trace_segments, aux_trace_rand_elements)) = aux_traces_segments
+                .iter()
+                .zip(aux_traces_rand_elements.iter()) // Here we are assuming that aux traces and
+                // rand elements for all traces are vectors
+                // of the same size
+                .nth(i)
+            {
+                trace.validate(&airs[i], aux_trace_segments, aux_trace_rand_elements);
+            } else {
+                let empty_col_matrix = Vec::new();
+                let empty_rand_elements = AuxTraceRandElements::<E>::new();
+                trace.validate(&airs[i], &empty_col_matrix, &empty_rand_elements);
+            }
         }
 
         // 2 ----- evaluate constraints -----------------------------------------------------------
@@ -421,15 +433,27 @@ pub trait Prover {
         for (i, air) in airs.iter().enumerate() {
             let constraint_coeffs = channel.get_constraint_composition_coeffs();
             constraint_coeffs_vec.push(constraint_coeffs.clone());
-            let evaluator = ConstraintEvaluator::new(
-                air,
-                aux_traces_rand_elements[i].clone(),
-                constraint_coeffs,
-            );
-            //evaluator_vec.push(evaluator);
-            let constraint_evaluations =
-                evaluator.evaluate(trace_commitment.trace_table(i), &domain);
-            constraint_evaluations_vec.push(constraint_evaluations);
+            if let Some(aux_trace_rand_elements) = aux_traces_rand_elements.iter().nth(i) {
+                let evaluator = ConstraintEvaluator::new(
+                    air,
+                    aux_trace_rand_elements.to_owned(),
+                    constraint_coeffs,
+                );
+
+                //evaluator_vec.push(evaluator);
+                let constraint_evaluations =
+                    evaluator.evaluate(trace_commitment.trace_table(i), &domain);
+                constraint_evaluations_vec.push(constraint_evaluations);
+            } else {
+                let empty_rand_elements = AuxTraceRandElements::<E>::new();
+                let evaluator =
+                    ConstraintEvaluator::new(air, empty_rand_elements, constraint_coeffs);
+
+                //evaluator_vec.push(evaluator);
+                let constraint_evaluations =
+                    evaluator.evaluate(trace_commitment.trace_table(i), &domain);
+                constraint_evaluations_vec.push(constraint_evaluations);
+            }
         }
 
         // We need to combine all comp polys into one final polynomial.
