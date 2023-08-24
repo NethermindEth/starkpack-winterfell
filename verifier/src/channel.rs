@@ -58,7 +58,6 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             fri_proof,
             pow_nonce,
         } = proof;
-
         // make sure AIR and proof base fields are the same
         if E::BaseField::get_modulus_le_bytes() != contexts[0].field_modulus_bytes() {
             return Err(VerifierError::InconsistentBaseField);
@@ -94,7 +93,6 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
 
         // --- parse trace and constraint queries -------------------------------------------------
         let trace_queries = TraceQueries::new(trace_queries, airs)?;
-        //println!("Trace_queiries from verifier{:?}", trace_queries);
         let constraint_queries = ConstraintQueries::new(constraint_queries, &airs[0])?;
 
         // --- parse FRI proofs -------------------------------------------------------------------

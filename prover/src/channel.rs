@@ -54,8 +54,6 @@ where
         airs: &'a Vec<A>,
         mut pub_inputs_elements_vec: Vec<Vec<A::BaseField>>,
     ) -> Self {
-        println!("n: {}", n);
-        println!("airs.len(): {}", airs.len());
         assert_eq!(
             n,
             airs.len(),
@@ -110,11 +108,13 @@ where
     /// Saves the evaluations of trace polynomials over the out-of-domain evaluation frame. This
     /// also reseeds the public coin with the hashes of the evaluation frame states.
     pub fn send_ood_trace_states(&mut self, trace_states_vec: Vec<&[Vec<E>]>) {
-        let ood_frames = &mut self.ood_frames.to_owned();
-        let results = trace_states_vec
-            .iter()
-            .zip(ood_frames.iter_mut())
-            .map(|(trace_states, ood_frame)| ood_frame.set_trace_states(trace_states));
+        let results =
+            trace_states_vec
+                .iter()
+                .zip(self.ood_frames.iter_mut())
+                .map(|(&trace_states, ood_frame)| {
+                    ood_frame.set_trace_states(trace_states)
+                });
         for result in results {
             self.public_coin.reseed(H::hash_elements(&result));
         }

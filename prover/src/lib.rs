@@ -210,7 +210,6 @@ pub trait Prover {
             .iter()
             .map(|pub_inputs| pub_inputs.to_elements())
             .collect();
-        println!("#traces: {}", traces.len());
 
         // create an instance of AIR for the provided parameters. this takes a generic description
         // of the computation (provided via AIR type), and creates a description of a specific
@@ -329,14 +328,14 @@ pub trait Prover {
                 })
                 .collect();
 
-            /* for mut trace in traces {
+            /* Leaving code for future reference to review aux inner mechanics
+             * for mut trace in traces {
                 #[cfg(feature = "std")]
                 let now = Instant::now();
 
                 // draw a set of random elements required to build an auxiliary trace segment
                 let rand_elements = channel.get_aux_trace_segment_rand_elements(i);
                 rand_elements_vec.push(rand_elements.to_owned());
-                //println!("The random elements of the Prover,{:?}", rand_elements_vec);
                 // build the trace segment
                 let aux_trace_segments = Vec::new();
                 let aux_trace_rand_elements = AuxTraceRandElements::new();
@@ -354,6 +353,7 @@ pub trait Prover {
                 aux_traces_rand_elements.push(aux_trace_rand_elements);
                 aux_segments.push(aux_segment);
             } */
+
             // extend the auxiliary trace segment and build a Merkle tree from the extended trace
             let aux_segments: Vec<_> = aux_segments.iter().map(|aux_segment| aux_segment).collect();
             let (aux_segments_lde, aux_segment_tree, aux_segments_polys) =
@@ -363,10 +363,6 @@ pub trait Prover {
             // its Merkle tree into the channel
             //let aux_segment1_tree = aux_segment_tree.clone();
             channel.commit_trace(*aux_segment_tree.root());
-            println!(
-                "The aux Trace root of the Prover,{:?}",
-                aux_segment_tree.root()
-            );
 
             for (i, trace_polys) in traces_polys.iter().enumerate() {
                 // append the segment to the trace commitment and trace polynomial table structs
@@ -385,29 +381,12 @@ pub trait Prover {
         // This checks validity of both, assertions and state transitions. We do this in debug
         // mode only because this is a very expensive operation.
         #[cfg(debug_assertions)]
-        /* for (i, trace) in traces.iter().enumerate() {
-            if let Some(aux_trace_segments) = aux_traces_segments.iter().nth(i) {
-                println!("Some or none?");
-                trace.validate(
-                    &airs[i],
-                    &aux_trace_segments,
-                    &aux_traces_rand_elements.iter().nth(i).unwrap(),
-                );
-            } else {
-                let empty_rand = AuxTraceRandElements::<E>::new();
-                trace.validate(&airs[i], &vec![], &empty_rand);
-            }
-            //println!("this works!");
-        } */
         for (i, trace) in traces.iter().enumerate() {
-            println!("airs lenght: {}", airs.len());
-            println!("aux_trace_seg lenght: {}", aux_traces_segments.len());
-            println!("aux_rand lenght: {}", aux_traces_rand_elements.len());
             if let Some((aux_trace_segments, aux_trace_rand_elements)) = aux_traces_segments
                 .iter()
-                .zip(aux_traces_rand_elements.iter()) // Here we are assuming that aux traces and
-                // rand elements for all traces are vectors
-                // of the same size
+                .zip(aux_traces_rand_elements.iter())   // Here we are assuming that aux traces and
+                                                        // rand elements for all traces are vectors
+                                                        // of the same size
                 .nth(i)
             {
                 trace.validate(&airs[i], aux_trace_segments, aux_trace_rand_elements);
@@ -533,9 +512,10 @@ pub trait Prover {
             .collect();
         let ood_trace_states_vec: Vec<&[Vec<E>]> = ood_traces_states
             .iter()
+            // .map(|ood_trace_states| &ood_trace_states[..])
             .map(|ood_trace_states| &ood_trace_states[..])
             .collect();
-        channel.send_ood_trace_states(ood_trace_states_vec);
+        channel.send_ood_trace_states(ood_trace_states_vec.clone());
 
         //let ood_evaluations = composition_poly.evaluate_at(z);
         let ood_evaluations = final_poly.evaluate_at(z);
