@@ -41,7 +41,7 @@ pub use air::{
 
 pub use math;
 use math::{
-    fields::{CubeExtension, QuadExtension},
+    fields::{f62::BaseElement, CubeExtension, QuadExtension},
     FieldElement, ToElements,
 };
 
@@ -192,6 +192,9 @@ where
     // z from the coin; in the interactive version of the protocol, the verifier sends this point z
     // to the prover, and the prover evaluates trace and constraint composition polynomials at z,
     // and sends the results back to the verifier.
+    let final_coeff: E = public_coin
+        .draw::<E>()
+        .map_err(|_| VerifierError::RandomCoinError)?;
     let constraint_commitment = channel.read_constraint_commitment();
     public_coin.reseed(constraint_commitment);
     //let constraint_commitment1 = channel.read_constraint_commitment();
@@ -228,7 +231,9 @@ where
             z,
         );
         public_coin.reseed(H::hash_elements(ood_traces_frame[i].values()));
-        ood_constraint_evaluation += ood_constraint_evaluation_1;
+        let j = i as u32;
+        ood_constraint_evaluation +=
+            ood_constraint_evaluation_1 * final_coeff.exp_vartime(E::PositiveInteger::from(j));
     }
 
     // read evaluations of composition polynomial columns sent by the prover, and reduce them into
@@ -244,7 +249,7 @@ where
             .iter()
             .enumerate()
             .fold(E::ZERO, |result, (i, &value)| {
-                result + z.exp_vartime(((i * (airs[i].trace_length())) as u32).into()) * value
+                result + z.exp_vartime(((i * (airs[0].trace_length())) as u32).into()) * value
             });
     public_coin.reseed(H::hash_elements(&ood_constraint_evaluations));
 

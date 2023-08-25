@@ -108,13 +108,10 @@ where
     /// Saves the evaluations of trace polynomials over the out-of-domain evaluation frame. This
     /// also reseeds the public coin with the hashes of the evaluation frame states.
     pub fn send_ood_trace_states(&mut self, trace_states_vec: Vec<&[Vec<E>]>) {
-        let results =
-            trace_states_vec
-                .iter()
-                .zip(self.ood_frames.iter_mut())
-                .map(|(&trace_states, ood_frame)| {
-                    ood_frame.set_trace_states(trace_states)
-                });
+        let results = trace_states_vec
+            .iter()
+            .zip(self.ood_frames.iter_mut())
+            .map(|(&trace_states, ood_frame)| ood_frame.set_trace_states(trace_states));
         for result in results {
             self.public_coin.reseed(H::hash_elements(&result));
         }
@@ -150,7 +147,11 @@ where
             .get_constraint_composition_coefficients(&mut self.public_coin)
             .expect("failed to draw composition coefficients")
     }
-
+    pub fn get_final_polynomial_coeffs(&mut self) -> E {
+        self.public_coin
+            .draw()
+            .expect("failed to draw final polynomial's coefficients")
+    }
     /// Returns an out-of-domain point drawn uniformly at random from the public coin.
     pub fn get_ood_point(&mut self) -> E {
         self.public_coin.draw().expect("failed to draw OOD point")

@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+//#![cfg_attr(not(feature = "std"), no_std)]
 pub use crate::crypto::{hashers::Blake3_256, DefaultRandomCoin};
 pub use crate::math::{fields::f128::BaseElement, FieldElement, ToElements};
 pub use prover::{
@@ -9,6 +9,7 @@ pub use prover::{
     StarkProof, Trace, TraceInfo, TraceLayout, TraceTable, TraceTableFragment,
     TransitionConstraintDegree,
 };
+use std::time::Instant;
 pub use verifier::{verify, VerifierError};
 
 fn main() {
@@ -102,13 +103,16 @@ fn main() {
     }
 
     let starting_vec: Vec<_> = (0..2_u128.pow(4)).map(|i| BaseElement::new(i)).collect();
-    let m = 1024;
+    let m = 1024 * 1024;
     let n = starting_vec.len();
     // Build the execution trace and get the result from the last step.
+    let now: Instant = Instant::now();
     let traces: Vec<_> = starting_vec
         .iter()
         .map(|&start| build_do_work_trace(start, m))
         .collect();
+    println!("Built execution Traces in {}ms", now.elapsed().as_millis());
+
     let results: Vec<_> = traces.iter().map(|trace| trace.get(0, m - 1)).collect();
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(
@@ -121,7 +125,16 @@ fn main() {
     );
     // Instantiate the prover and generate the proof.
     let prover = WorkProver::new(options);
+    let now: Instant = Instant::now();
     let proof = prover.prove(n, traces).unwrap();
+    println!("Generated the proof in {}ms", now.elapsed().as_millis());
+
+    let proof_bytes: Vec<u8> = proof.to_bytes();
+    println!("Proof size: {:.1} KB", proof_bytes.len() as f64 / 1024f64);
+    //println!("Proof Security: {} bits", proof.security_level(true));
+
+    //let parsed_proof: StarkProof = StarkProof::from_bytes(&proof_bytes).unwrap();
+    //assert_eq!(proof, parsed_proof);
     // Verify the proof. The number of steps and options are encoded in the proof itself,
     // so we don't need to pass them explicitly to the verifier.
     let pub_inputs_vec = starting_vec
@@ -129,12 +142,16 @@ fn main() {
         .zip(results.into_iter())
         .map(|(start, result)| PublicInputs { start, result })
         .collect();
+    let now: Instant = Instant::now();
     match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
         proof,
         pub_inputs_vec,
     ) {
-        Ok(validation) => {
-            println!("Proof is valid");
+        Ok(_) => {
+            println!(
+                "Proof verified in {:.1} ms",
+                now.elapsed().as_micros() as f64 / 1000f64
+            );
         }
         Err(err) => {
             println!("Proof is not valid\nErr: {}", err);
