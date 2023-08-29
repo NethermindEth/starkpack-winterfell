@@ -86,7 +86,7 @@ pub fn verify<AIR, HashFn, RandCoin>(
 ) -> Result<(), VerifierError> 
 where 
     AIR: Air, 
-    HashFn: ElementHasher<BaseField = AIR::BaseField> + std::fmt::Debug,
+    HashFn: ElementHasher<BaseField = AIR::BaseField>,
     RandCoin: RandomCoin<BaseField = AIR::BaseField, Hasher = HashFn>,
 {
     // build a seed for the public coin; the initial seed is a hash of the proof context and the

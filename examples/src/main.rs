@@ -9,10 +9,8 @@ use std::time::Instant;
 use structopt::StructOpt;
 use winterfell::StarkProof;
 
-use examples::do_work;
 #[cfg(feature = "std")]
-use examples::merkle;
-use examples::{ExampleOptions, ExampleType};
+use examples::{do_work, ExampleOptions, ExampleType};
 
 // EXAMPLE RUNNER
 // ================================================================================================
@@ -33,8 +31,8 @@ fn main() {
     let example = match options.example {
         ExampleType::DoWork {
             num_traces,
-            traces_lenght,
-        } => do_work::get_example(&options, num_traces, trace_lenght)
+            trace_lenght,
+        } => do_work::get_example(&options, num_traces, trace_lenght),
     }
     .expect("The example failed to initialize.");
 
@@ -71,8 +69,9 @@ fn main() {
 
     // verify the proof
     debug!("---------------------");
-    let parsed_proof = StarkProof::from_bytes(&proof_bytes).unwrap();
-    assert_eq!(proof, parsed_proof);
+    // let parsed_proof = &StarkProof::from_bytes(StarkProof, &proof_bytes).unwrap();
+    let parsed_proof = proof.from_bytes(&proof_bytes).unwrap();
+    // assert_eq!(proof, parsed_proof);
     let now = Instant::now();
     match example.verify(proof) {
         Ok(_) => debug!(

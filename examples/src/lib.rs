@@ -11,7 +11,6 @@ use winterfell::{
 };
 
 #[cfg(feature = "std")]
-pub mod merkle;
 pub mod do_work;
 
 #[cfg(test)]
@@ -119,6 +118,10 @@ impl ExampleOptions {
 pub enum ExampleType {
     // Do work example
     DoWork {
+        /// Lenght of trace using one column and number of traces
+        #[structopt(short = "n", default_value = "1024")]
+        num_traces: usize,
+        trace_lenght: usize,
     },
 }
 
@@ -126,7 +129,7 @@ pub enum ExampleType {
 /// support all listed hash functions.
 ///
 /// Choice of a hash function has a direct impact on proof generation time, proof size, and proof
-/// soundness. In general, sounds of the proof is bounded by the collision resistance of the hash
+/// soundness. In general, ssounds of the proof is bounded by the collision resistance of the hash
 /// function used by the protocol.
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -137,6 +140,7 @@ pub enum HashFunction {
     Blake3_192,
 
     /// BLAKE3 hash function with 256 bit output.
+
     ///
     /// When this function is used in the STARK protocol, proof security cannot exceed 128 bits.
     Blake3_256,
