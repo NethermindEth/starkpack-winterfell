@@ -10,9 +10,16 @@ use winterfell::{
     FieldExtension, ProofOptions, StarkProof, VerifierError,
 };
 
+pub mod fibonacci;
+#[cfg(feature = "std")]
+pub mod lamport;
 #[cfg(feature = "std")]
 pub mod merkle;
-pub mod do_work;
+pub mod rescue;
+#[cfg(feature = "std")]
+pub mod rescue_raps;
+pub mod utils;
+pub mod vdf;
 
 #[cfg(test)]
 mod tests;
@@ -117,8 +124,81 @@ impl ExampleOptions {
 #[derive(StructOpt, Debug)]
 //#[structopt(about = "available examples")]
 pub enum ExampleType {
-    // Do work example
-    DoWork {
+    /// Compute a Fibonacci sequence using trace table with 2 registers
+    Fib {
+        /// Length of Fibonacci sequence; must be a power of two
+        #[structopt(short = "n", default_value = "1048576")]
+        sequence_length: usize,
+    },
+    /// Compute a Fibonacci sequence using trace table with 8 registers
+    Fib8 {
+        /// Length of Fibonacci sequence; must be a power of two
+        #[structopt(short = "n", default_value = "1048576")]
+        sequence_length: usize,
+    },
+    /// Compute a multiplicative Fibonacci sequence using trace table with 2 registers
+    Mulfib {
+        /// Length of Fibonacci sequence; must be a power of two
+        #[structopt(short = "n", default_value = "1048576")]
+        sequence_length: usize,
+    },
+    /// Compute a multiplicative Fibonacci sequence using trace table with 8 registers
+    Mulfib8 {
+        /// Length of Fibonacci sequence; must be a power of two
+        #[structopt(short = "n", default_value = "1048576")]
+        sequence_length: usize,
+    },
+    /// Compute a Fibonacci sequence using trace table with 2 registers in `f64` field.
+    FibSmall {
+        /// Length of Fibonacci sequence; must be a power of two
+        #[structopt(short = "n", default_value = "65536")]
+        sequence_length: usize,
+    },
+    /// Execute a simple VDF function
+    Vdf {
+        /// Number of steps in the VDF function; must be a power of two
+        #[structopt(short = "n", default_value = "1048576")]
+        num_steps: usize,
+    },
+    /// Similar to the VDF example, but exempts an extra row from transition constraints.
+    VdfExempt {
+        /// Number of steps in the VDF function; must be one less than a power of two
+        #[structopt(short = "n", default_value = "1048575")]
+        num_steps: usize,
+    },
+    /// Compute a hash chain using Rescue hash function
+    Rescue {
+        /// Length of the hash chain; must be a power of two
+        #[structopt(short = "n", default_value = "1024")]
+        chain_length: usize,
+    },
+    /// Compute two hash chains absorbing sequences that are a permutation of each other
+    #[cfg(feature = "std")]
+    RescueRaps {
+        /// Length of the hash chain; must be a power of two and at least 4
+        #[structopt(short = "n", default_value = "1024")]
+        chain_length: usize,
+    },
+    /// Compute a root of a Merkle path using Rescue hash function
+    #[cfg(feature = "std")]
+    Merkle {
+        /// Depth of the Merkle tree; must be one less than a power of two
+        #[structopt(short = "n", default_value = "7")]
+        tree_depth: usize,
+    },
+    /// Compute an aggregate Lamport+ signature
+    #[cfg(feature = "std")]
+    LamportA {
+        /// Number of signatures to aggregate; must be a power of two
+        #[structopt(short = "n", default_value = "4")]
+        num_signatures: usize,
+    },
+    /// Compute a threshold Lamport+ signature
+    #[cfg(feature = "std")]
+    LamportT {
+        /// Number of signers; must be one less than a power of two
+        #[structopt(short = "n", default_value = "3")]
+        num_signers: usize,
     },
 }
 

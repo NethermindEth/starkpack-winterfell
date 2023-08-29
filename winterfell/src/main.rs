@@ -101,7 +101,7 @@ fn main() {
         }
     }
 
-    let starting_vec: Vec<_> = (0..2_u128.pow(4)).map(|i| BaseElement::new(i)).collect();
+    let starting_vec: Vec<_> = (0..2_u128.pow(5)).map(|i| BaseElement::new(i)).collect();
     let m = 1024;
     let n = starting_vec.len();
     // Build the execution trace and get the result from the last step.
@@ -133,7 +133,7 @@ fn main() {
         proof,
         pub_inputs_vec,
     ) {
-        Ok(validation) => {
+        Ok(_) => {
             println!("Proof is valid");
         }
         Err(err) => {
