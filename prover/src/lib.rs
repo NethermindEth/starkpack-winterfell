@@ -62,7 +62,7 @@ use math::{
     add_in_place,
     fft::infer_degree,
     fields::{CubeExtension, QuadExtension},
-    log2, ExtensibleField, FieldElement, StarkField, ToElements,
+    log2, mul_acc, ExtensibleField, FieldElement, StarkField, ToElements,
 };
 
 pub use crypto;
@@ -384,9 +384,9 @@ pub trait Prover {
         for (i, trace) in traces.iter().enumerate() {
             if let Some((aux_trace_segments, aux_trace_rand_elements)) = aux_traces_segments
                 .iter()
-                .zip(aux_traces_rand_elements.iter())   // Here we are assuming that aux traces and
-                                                        // rand elements for all traces are vectors
-                                                        // of the same size
+                .zip(aux_traces_rand_elements.iter()) // Here we are assuming that aux traces and
+                // rand elements for all traces are vectors
+                // of the same size
                 .nth(i)
             {
                 trace.validate(&airs[i], aux_trace_segments, aux_trace_rand_elements);
@@ -406,12 +406,12 @@ pub trait Prover {
         // identical denominators.
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let mut constraint_coeffs_vec = Vec::new();
+        //let mut constraint_coeffs_vec = Vec::new();
         //let mut evaluator_vec = Vec::new();
         let mut constraint_evaluations_vec = Vec::new();
         for (i, air) in airs.iter().enumerate() {
             let constraint_coeffs = channel.get_constraint_composition_coeffs();
-            constraint_coeffs_vec.push(constraint_coeffs.clone());
+            //constraint_coeffs_vec.push(constraint_coeffs.clone());
             if let Some(aux_trace_rand_elements) = aux_traces_rand_elements.iter().nth(i) {
                 let evaluator = ConstraintEvaluator::new(
                     air,
@@ -466,8 +466,16 @@ pub trait Prover {
             num_cols_vec.push(num_cols);
         }
         let mut final_comb_poly = composition_polys.first().unwrap().to_owned();
+        let final_coeff = channel.get_final_polynomial_coeffs();
+        let mut i: u32 = 1;
         for comp_poly in composition_polys.iter().skip(1) {
-            add_in_place(&mut final_comb_poly, &comp_poly);
+            let mut comb_poly = Vec::new();
+            for &coeff in comp_poly {
+                comb_poly.push(coeff * final_coeff.exp_vartime(E::PositiveInteger::from(i)));
+            }
+            i += 1;
+            add_in_place(&mut final_comb_poly, &comb_poly);
+            //mul_acc(&mut final_comb_poly, comp_poly, final_coeff)
         }
         //assert_eq!(trace_length, trace1_length, "Traces of different lenght");
         //assert_eq!(num_cols, num_cols1, "Traces of different number of columns");
