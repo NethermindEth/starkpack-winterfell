@@ -39,9 +39,5 @@ structopt = { version = "0.3", default-features = false }
 criterion = "0.5"
 
 [[bench]]
-name = "fibonacci"
-harness = false
-
-[[bench]]
-name = "rescue"
+name = "do_work"
 harness = false
