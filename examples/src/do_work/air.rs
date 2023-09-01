@@ -1,4 +1,4 @@
-use winterfell::{Air, AirContext, BaseElement, ToElements, TransitionConstraintDegree, Assertion};
+use winterfell::{Air, AirContext, Assertion, BaseElement, ToElements, TransitionConstraintDegree};
 
 // DO WORK AIR
 // ================================================================================================
@@ -47,7 +47,7 @@ impl Air for DoWorkAir {
     fn evaluate_transition<E: winterfell::FieldElement<BaseField = Self::BaseField>>(
         &self,
         frame: &winterfell::EvaluationFrame<E>,
-        periodic_values: &[E],
+        _periodic_values: &[E],
         result: &mut [E],
     ) {
         let current_state = &frame.current()[0];

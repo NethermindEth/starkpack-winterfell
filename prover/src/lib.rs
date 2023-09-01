@@ -55,14 +55,14 @@ pub use utils::{
 };
 
 use fri::FriProver;
-use utils::{batch_iter_mut, collections::Vec};
+use utils::collections::Vec;
 
 pub use math;
 use math::{
     add_in_place,
     fft::infer_degree,
     fields::{CubeExtension, QuadExtension},
-    log2, mul_acc, ExtensibleField, FieldElement, StarkField, ToElements,
+    ExtensibleField, FieldElement, StarkField, ToElements,
 };
 
 pub use crypto;
@@ -327,32 +327,6 @@ pub trait Prover {
                     aux_segments.push(aux_segment);
                 })
                 .collect();
-
-            /* Leaving code for future reference to review aux inner mechanics
-             * for mut trace in traces {
-                #[cfg(feature = "std")]
-                let now = Instant::now();
-
-                // draw a set of random elements required to build an auxiliary trace segment
-                let rand_elements = channel.get_aux_trace_segment_rand_elements(i);
-                rand_elements_vec.push(rand_elements.to_owned());
-                // build the trace segment
-                let aux_trace_segments = Vec::new();
-                let aux_trace_rand_elements = AuxTraceRandElements::new();
-                let aux_segment = trace
-                    .build_aux_segment(&aux_trace_segments, &rand_elements)
-                    .expect("failed build auxiliary trace segment");
-                #[cfg(feature = "std")]
-                debug!(
-                    "Built auxiliary trace segment of {} columns and 2^{} steps in {} ms",
-                    aux_segment.num_cols(),
-                    aux_segment.num_rows().ilog2(),
-                    now.elapsed().as_millis()
-                );
-                aux_traces_segments.push(aux_trace_segments);
-                aux_traces_rand_elements.push(aux_trace_rand_elements);
-                aux_segments.push(aux_segment);
-            } */
 
             // extend the auxiliary trace segment and build a Merkle tree from the extended trace
             let aux_segments: Vec<_> = aux_segments.iter().map(|aux_segment| aux_segment).collect();

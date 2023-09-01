@@ -160,10 +160,9 @@ where
                 .iter()
                 .fold(row, |mut acc, next_trace_states| {
                     let next_trace_row = next_trace_states.iter().nth(i).unwrap().to_owned();
-                    // let result = acc.extend_from_slice(next_trace_row.as_slice());
                     // TODO^ Check why is extend not working
-                    let result = [acc, next_trace_row].concat();
-                    result
+                    acc = [acc, next_trace_row].concat();
+                    acc
                 })
         })
         .collect();

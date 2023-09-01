@@ -34,7 +34,7 @@ impl<H: ElementHasher> DoWorkProver<H> {
     }
 }
 
-impl<H: ElementHasher> Prover for DoWorkProver<H> 
+impl<H: ElementHasher> Prover for DoWorkProver<H>
 where
     H: ElementHasher<BaseField = BaseElement>,
 {
@@ -44,7 +44,10 @@ where
     type HashFn = H;
     type RandomCoin = DefaultRandomCoin<Self::HashFn>;
 
-    fn get_pub_inputs(&self, trace: &Self::Trace) -> <<Self as Prover>::Air as winterfell::Air>::PublicInputs {
+    fn get_pub_inputs(
+        &self,
+        trace: &Self::Trace,
+    ) -> <<Self as Prover>::Air as winterfell::Air>::PublicInputs {
         let last_step = trace.length() - 1;
         PublicInputs {
             start: trace.get(0, 0),

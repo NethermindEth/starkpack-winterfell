@@ -3,8 +3,8 @@ use core::marker::PhantomData;
 use log::debug;
 use std::time::Instant;
 use winterfell::{
-    crypto::{DefaultRandomCoin, Digest, ElementHasher, MerkleTree},
-    math::{fields::f128::BaseElement, FieldElement, StarkField},
+    crypto::{DefaultRandomCoin, ElementHasher},
+    math::{fields::f128::BaseElement, FieldElement},
     ProofOptions, Prover, StarkProof, Trace, TraceTable, VerifierError,
 };
 
@@ -58,7 +58,6 @@ impl<H: ElementHasher> DoWorkExample<H> {
             .map(|i| BaseElement::new(i))
             .collect();
         let results = calculate_results(&starting_vec, trace_lenght);
-        //TODO^ calculate results in utils
         DoWorkExample {
             options,
             starting_vec,
@@ -74,7 +73,7 @@ fn calculate_results(starting_vec: &Vec<BaseElement>, trace_lenght: usize) -> Ve
         .iter()
         .map(|start| {
             let mut result = start.to_owned();
-            for _ in 0..trace_lenght {
+            for _ in 0..trace_lenght - 1 {
                 result = result.exp(3u128) + BaseElement::new(42u128);
             }
             result

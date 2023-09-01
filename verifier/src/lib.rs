@@ -41,7 +41,7 @@ pub use air::{
 
 pub use math;
 use math::{
-    fields::{f62::BaseElement, CubeExtension, QuadExtension},
+    fields::{CubeExtension, QuadExtension},
     FieldElement, ToElements,
 };
 

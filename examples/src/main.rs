@@ -7,7 +7,6 @@ use log::debug;
 use std::io::Write;
 use std::time::Instant;
 use structopt::StructOpt;
-use winterfell::StarkProof;
 
 #[cfg(feature = "std")]
 use examples::{do_work, ExampleOptions, ExampleType};

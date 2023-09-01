@@ -119,8 +119,9 @@ pub enum ExampleType {
     // Do work example
     DoWork {
         /// Lenght of trace using one column and number of traces
-        #[structopt(short = "n", default_value = "1024")]
+        #[structopt(short = "n", long = "num_traces", default_value = "512")]
         num_traces: usize,
+        #[structopt(short = "l", long = "traces_len", default_value = "1024")]
         trace_lenght: usize,
     },
 }

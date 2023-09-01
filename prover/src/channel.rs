@@ -26,7 +26,6 @@ where
     H: ElementHasher<BaseField = A::BaseField>,
     R: RandomCoin<BaseField = E::BaseField, Hasher = H>,
 {
-    n: usize,
     airs: &'a Vec<A>,
     public_coin: R,
     contexts: Vec<Context>,
@@ -52,7 +51,7 @@ where
     pub fn new(
         n: usize,
         airs: &'a Vec<A>,
-        mut pub_inputs_elements_vec: Vec<Vec<A::BaseField>>,
+        pub_inputs_elements_vec: Vec<Vec<A::BaseField>>,
     ) -> Self {
         assert_eq!(
             n,
@@ -79,7 +78,6 @@ where
         }
 
         ProverChannel {
-            n,
             airs,
             public_coin: RandomCoin::new(&coin_seed_elements),
             contexts,
