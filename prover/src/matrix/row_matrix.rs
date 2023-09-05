@@ -201,7 +201,7 @@ impl<E: FieldElement> RowMatrix<E> {
         // build Merkle tree out of hashed rows
         MerkleTree::new(row_hashes).expect("failed to construct trace Merkle tree")
     }
-    pub fn commit_to_comb_rows<H>(&self, traces_lde: Vec<RowMatrix<E>>) -> MerkleTree<H>
+    pub fn commit_to_comb_rows<H>(&self, traces_lde: &Vec<RowMatrix<E>>) -> MerkleTree<H>
     where
         H: ElementHasher<BaseField = E::BaseField>,
     {

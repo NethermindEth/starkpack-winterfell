@@ -656,7 +656,7 @@ pub trait Prover {
         // build trace commitment
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let trace_tree = first_trace_lde.commit_to_comb_rows(traces_lde.clone());
+        let trace_tree = first_trace_lde.commit_to_comb_rows(&traces_lde);
         // TODO^ This looks ugly how can we change it?
 
         #[cfg(feature = "std")]

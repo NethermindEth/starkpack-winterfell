@@ -107,11 +107,9 @@ where
             let public_coin = RandCoin::new(&public_coin_seed);
             match VerifierChannel::new(&airs, proof) {
                 Ok(channel) => {
-                    println!("Verifier channel creation successful");
                     perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(&airs, channel, public_coin)
                 },
                 Err(err) => {
-                    println!("Verifier channel creation failed");
                     println!("Err: {}", err);
                     Err(err)
                 },
