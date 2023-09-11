@@ -13,6 +13,9 @@ use examples::{do_work, ExampleOptions, ExampleType};
 
 // EXAMPLE RUNNER
 // ================================================================================================
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
 
 fn main() {
     // configure logging
@@ -38,6 +41,9 @@ fn main() {
     // generate proof
     let now = Instant::now();
     let example = example.as_ref();
+    
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
     let proof = example.prove();
     debug!(
         "---------------------\nProof generated in {} ms",
