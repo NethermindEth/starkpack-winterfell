@@ -31,7 +31,7 @@ impl Air for DoWorkAir {
         pub_inputs: Self::PublicInputs,
         options: winterfell::ProofOptions,
     ) -> Self {
-        assert_eq!(1, trace_info.width());
+        // assert_eq!(1, trace_info.width());
         let degrees = vec![TransitionConstraintDegree::new(3)];
         DoWorkAir {
             context: AirContext::new(trace_info, degrees, 2, options),

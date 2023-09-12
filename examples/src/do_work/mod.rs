@@ -20,7 +20,8 @@ pub fn get_example(
     num_traces: usize,
     trace_lenght: usize,
 ) -> Result<Box<dyn Example>, String> {
-    let (options, hash_fn) = options.to_proof_options(28, 8);
+    let (options, hash_fn) = options.to_proof_options(31, 8);
+    println!("{:?}", options);
     println!("Getting example");
 
     match hash_fn {

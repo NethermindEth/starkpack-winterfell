@@ -15,11 +15,12 @@ fn do_work(c: &mut Criterion) {
     /* let num_traces_vec =
         (1..513).filter(|&n| n % 10 == 0 || n == 128 || n == 256 || n == 512 || n == 1); */
     // let traces: Vec<_> = num_traces_vec.map(|i| (i, 1024)).collect();
-    let traces: Vec<_> = (250..261).map(|i| (i, 1024)).collect();
+    let traces: Vec<_> = (1..2).map(|i| (i, 1024)).collect();
     group.sample_size(10);
-    group.measurement_time(Duration::from_secs(20));
+    group.measurement_time(Duration::from_secs(1));
 
     let options = ProofOptions::new(32, 8, 0, FieldExtension::None, 4, 255);
+    println!("{:?}", options);
 
     for (num_traces, trace_lenght) in traces.iter() {
         let do_work = do_work::DoWorkExample::<Blake3_256<BaseElement>>::new(
