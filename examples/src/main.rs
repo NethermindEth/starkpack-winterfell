@@ -4,6 +4,7 @@
 // LICENSE file in the root directory of this source tree.
 
 use log::debug;
+use winterfell::{ProofOptions, FieldExtension};
 use std::io::Write;
 use std::time::Instant;
 use structopt::StructOpt;
@@ -26,6 +27,7 @@ fn main() {
 
     // read command-line args
     let options = ExampleOptions::from_args();
+    println!("{:?}", options);
 
     debug!("============================================================");
 

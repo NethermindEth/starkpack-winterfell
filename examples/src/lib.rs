@@ -83,14 +83,23 @@ impl ExampleOptions {
             "griffin_jive64_256" => HashFunction::GriffinJive64_256,
             val => panic!("'{val}' is not a valid hash function option"),
         };
+        // let hash_fn = HashFunction::Rp64_256;
 
         (
+            // ProofOptions::new(
+            //     num_queries,
+            //     blowup_factor,
+            //     self.grinding_factor,
+            //     field_extension,
+            //     self.folding_factor,
+            //     31,
+            // ),
             ProofOptions::new(
-                num_queries,
-                blowup_factor,
-                self.grinding_factor,
-                field_extension,
-                self.folding_factor,
+                32,
+                8,
+                0,
+                FieldExtension::None,
+                4,
                 31,
             ),
             hash_fn,

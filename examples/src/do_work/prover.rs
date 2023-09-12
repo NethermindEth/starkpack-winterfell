@@ -60,14 +60,20 @@ where
 }
 
 fn build_do_work_trace(start: BaseElement, trace_lenght: usize) -> TraceTable<BaseElement> {
-    let trace_width = 1;
+    let trace_width = 10;
     let mut trace = TraceTable::new(trace_width, trace_lenght);
     trace.fill(
         |state| {
+            for i in 0..state.len() {
+                state[i] = start
+            }
             state[0] = start;
         },
         |_, state| {
             state[0] = state[0].exp(3u32.into()) + BaseElement::new(42);
+            for i in 1..state.len() {
+                state[i] = state[i];
+            }
         },
     );
     trace
