@@ -21,7 +21,6 @@ pub fn get_example(
     trace_lenght: usize,
 ) -> Result<Box<dyn Example>, String> {
     let (options, hash_fn) = options.to_proof_options(31, 8);
-    println!("{:?}", options);
     println!("Getting example");
 
     match hash_fn {
