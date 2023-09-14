@@ -1,5 +1,5 @@
 //#![cfg_attr(not(feature = "std"), no_std)]
-pub use crate::crypto::{hashers::Blake3_256, DefaultRandomCoin};
+pub use crate::crypto::{hashers::Rp64_256, DefaultRandomCoin};
 pub use crate::math::{fields::f128::BaseElement, FieldElement, ToElements};
 pub use prover::{
     crypto, iterators, math, Air, AirContext, Assertion, AuxTraceRandElements, BoundaryConstraint,
@@ -88,7 +88,8 @@ fn main() {
         type BaseField = BaseElement;
         type Air = WorkAir;
         type Trace = TraceTable<Self::BaseField>;
-        type HashFn = Blake3_256<Self::BaseField>;
+        //type HashFn = Blake3_256<Self::BaseField>;
+        type HashFn = Rp64_256;
         type RandomCoin = DefaultRandomCoin<Self::HashFn>;
         fn get_pub_inputs(&self, trace: &Self::Trace) -> PublicInputs {
             let last_step = trace.length() - 1;
@@ -143,10 +144,7 @@ fn main() {
         .map(|(start, result)| PublicInputs { start, result })
         .collect();
     let now: Instant = Instant::now();
-    match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
-        proof,
-        pub_inputs_vec,
-    ) {
+    match verify::<WorkAir, Rp64_256, DefaultRandomCoin<Rp64_256>>(proof, pub_inputs_vec) {
         Ok(_) => {
             println!(
                 "Proof verified in {:.1} ms",

@@ -113,6 +113,7 @@ const INV_ALPHA: u64 = 10540996611094048183;
 /// to deserialize them into field elements and then hash them using
 /// [hash_elements()](Rp64_256::hash_elements) function rather then hashing the serialized bytes
 /// using [hash()](Rp64_256::hash) function.
+#[derive(Debug)]
 pub struct Rp64_256();
 
 impl Hasher for Rp64_256 {
