@@ -62,7 +62,7 @@ use utils::collections::Vec;
 /// assert_ne!(e1, e2);
 /// ```
 pub struct DefaultRandomCoin<H: ElementHasher> {
-    seed: H::Digest,
+    pub seed: H::Digest,
     counter: u64,
 }
 
@@ -83,6 +83,7 @@ impl<B: StarkField, H: ElementHasher<BaseField = B>> RandomCoin for DefaultRando
     /// Returns a new random coin instantiated with the provided `seed`.
     fn new(seed: &[Self::BaseField]) -> Self {
         let seed = H::hash_elements(seed);
+        //print!("This is the seed of DefautRandomCoin: {:?}", seed);
         Self { seed, counter: 0 }
     }
 

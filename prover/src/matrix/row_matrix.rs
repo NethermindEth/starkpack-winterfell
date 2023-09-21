@@ -179,6 +179,7 @@ impl<E: FieldElement> RowMatrix<E> {
     ///   becomes a leaf in the tree. Thus, the number of leaves in the tree is equal to the
     ///   number of rows in the matrix.
     /// * The resulting Merkle tree is returned as the commitment to the entire matrix.
+
     pub fn commit_to_rows<H>(&self) -> MerkleTree<H>
     where
         H: ElementHasher<BaseField = E::BaseField>,
@@ -193,6 +194,41 @@ impl<E: FieldElement> RowMatrix<E> {
             |batch: &mut [H::Digest], batch_offset: usize| {
                 for (i, row_hash) in batch.iter_mut().enumerate() {
                     *row_hash = H::hash_elements(self.row(batch_offset + i));
+                }
+            }
+        );
+
+        // build Merkle tree out of hashed rows
+        MerkleTree::new(row_hashes).expect("failed to construct trace Merkle tree")
+    }
+    pub fn commit_to_comb_rows<H>(&self, traces_lde: &Vec<RowMatrix<E>>) -> MerkleTree<H>
+    where
+        H: ElementHasher<BaseField = E::BaseField>,
+    {
+        // allocate vector to store row hashes
+
+        let mut row_hashes = unsafe { uninit_vector::<H::Digest>(self.num_rows()) };
+
+        // iterate though matrix rows, hashing each row
+        batch_iter_mut!(
+            &mut row_hashes,
+            128, // min batch size
+            |batch: &mut [H::Digest], batch_offset: usize| {
+                for (i, row_hash) in batch.iter_mut().enumerate() {
+                    let traces_row: Vec<_> = traces_lde
+                        .iter()
+                        .skip(1)
+                        .map(|trace_lde| trace_lde.row(batch_offset + i))
+                        .collect();
+                    let trace_row = self.row(batch_offset + i);
+                    let mut comb_rows = trace_row.to_vec();
+                    for next_trace_row in traces_row {
+                        let next_trace_row_vec = next_trace_row.to_vec();
+                        // comb_rows.extend_from_slice(next_trace_row);
+                        comb_rows = [comb_rows.to_owned(), next_trace_row_vec].concat();
+                        // TODO^: Check if is best to concat or creating a vector
+                    }
+                    *row_hash = H::hash_elements(&comb_rows);
                 }
             }
         );

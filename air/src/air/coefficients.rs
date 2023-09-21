@@ -110,7 +110,7 @@ pub struct ConstraintCompositionCoefficients<E: FieldElement> {
 #[derive(Debug, Clone)]
 pub struct DeepCompositionCoefficients<E: FieldElement> {
     /// Trace polynomial composition coefficients $\alpha_i$.
-    pub trace: Vec<E>,
+    pub traces: Vec<Vec<E>>,
     /// Constraint column polynomial composition coefficients $\beta_j$.
     pub constraints: Vec<E>,
 }

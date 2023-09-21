@@ -5,7 +5,7 @@
 
 use crate::VerifierError;
 use air::{
-    proof::{Queries, StarkProof, Table},
+    proof::{JointTraceQueries, Queries, StarkProof, Table},
     Air, EvaluationFrame,
 };
 use crypto::{BatchMerkleProof, ElementHasher, MerkleTree};
@@ -23,22 +23,22 @@ use utils::{collections::Vec, string::ToString};
 /// well-formed in the context of the computation for the specified [Air].
 pub struct VerifierChannel<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     // trace queries
-    trace_roots: Vec<H::Digest>,
-    trace_queries: Option<TraceQueries<E, H>>,
+    pub trace_roots: Vec<H::Digest>,
+    pub trace_queries: Option<TraceQueries<E, H>>,
     // constraint queries
-    constraint_root: H::Digest,
-    constraint_queries: Option<ConstraintQueries<E, H>>,
+    pub constraint_root: H::Digest,
+    pub constraint_queries: Option<ConstraintQueries<E, H>>,
     // FRI proof
-    fri_roots: Option<Vec<H::Digest>>,
-    fri_layer_proofs: Vec<BatchMerkleProof<H>>,
-    fri_layer_queries: Vec<Vec<E>>,
-    fri_remainder: Option<Vec<E>>,
-    fri_num_partitions: usize,
+    pub fri_roots: Option<Vec<H::Digest>>,
+    pub fri_layer_proofs: Vec<BatchMerkleProof<H>>,
+    pub fri_layer_queries: Vec<Vec<E>>,
+    pub fri_remainder: Option<Vec<E>>,
+    pub fri_num_partitions: usize,
     // out-of-domain frame
-    ood_trace_frame: Option<TraceOodFrame<E>>,
-    ood_constraint_evaluations: Option<Vec<E>>,
+    pub ood_traces_frame: Vec<Option<TraceOodFrame<E>>>,
+    pub ood_constraint_evaluations: Option<Vec<E>>,
     // query proof-of-work
-    pow_nonce: u64,
+    pub pow_nonce: u64,
 }
 
 impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChannel<E, H> {
@@ -46,42 +46,54 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     // --------------------------------------------------------------------------------------------
     /// Creates and returns a new [VerifierChannel] initialized from the specified `proof`.
     pub fn new<A: Air<BaseField = E::BaseField>>(
-        air: &A,
+        airs: &Vec<A>,
         proof: StarkProof,
     ) -> Result<Self, VerifierError> {
         let StarkProof {
-            context,
+            contexts,
             commitments,
             trace_queries,
             constraint_queries,
-            ood_frame,
+            ood_frames,
             fri_proof,
             pow_nonce,
         } = proof;
-
         // make sure AIR and proof base fields are the same
-        if E::BaseField::get_modulus_le_bytes() != context.field_modulus_bytes() {
+        if E::BaseField::get_modulus_le_bytes() != contexts[0].field_modulus_bytes() {
             return Err(VerifierError::InconsistentBaseField);
         }
-        let constraint_frame_width = air.context().num_constraint_composition_columns();
+        let constraint_frames_width: Vec<_> = airs
+            .iter()
+            .map(|air| air.context().num_constraint_composition_columns())
+            .collect();
 
-        let num_trace_segments = air.trace_layout().num_segments();
-        let main_trace_width = air.trace_layout().main_trace_width();
-        let aux_trace_width = air.trace_layout().aux_trace_width();
-        let lde_domain_size = air.lde_domain_size();
-        let fri_options = air.options().to_fri_options();
+        let num_traces_segments: Vec<_> = airs
+            .iter()
+            .map(|air| air.trace_layout().num_segments())
+            .collect();
+        let main_traces_width: Vec<_> = airs
+            .iter()
+            .map(|air| air.trace_layout().main_trace_width())
+            .collect();
+        let aux_traces_width: Vec<_> = airs
+            .iter()
+            .map(|air| air.trace_layout().aux_trace_width())
+            .collect();
+        let lde_domain_sizes: Vec<_> = airs.iter().map(|air| air.lde_domain_size()).collect();
+        let fri_options = airs[0].options().to_fri_options();
 
         // --- parse commitments ------------------------------------------------------------------
         let (trace_roots, constraint_root, fri_roots) = commitments
             .parse::<H>(
-                num_trace_segments,
-                fri_options.num_fri_layers(lde_domain_size),
+                num_traces_segments[0],
+                //num_trace1_segments,
+                fri_options.num_fri_layers(lde_domain_sizes[0]),
             )
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
 
         // --- parse trace and constraint queries -------------------------------------------------
-        let trace_queries = TraceQueries::new(trace_queries, air)?;
-        let constraint_queries = ConstraintQueries::new(constraint_queries, air)?;
+        let trace_queries = TraceQueries::new(trace_queries, airs)?;
+        let constraint_queries = ConstraintQueries::new(constraint_queries, &airs[0])?;
 
         // --- parse FRI proofs -------------------------------------------------------------------
         let fri_num_partitions = fri_proof.num_partitions();
@@ -89,16 +101,31 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             .parse_remainder()
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
         let (fri_layer_queries, fri_layer_proofs) = fri_proof
-            .parse_layers::<H, E>(lde_domain_size, fri_options.folding_factor())
+            .parse_layers::<H, E>(lde_domain_sizes[0], fri_options.folding_factor())
             .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
 
         // --- parse out-of-domain evaluation frame -----------------------------------------------
-        let (ood_trace_evaluations, ood_constraint_evaluations) = ood_frame
-            .parse(main_trace_width, aux_trace_width, constraint_frame_width)
-            .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
-        let ood_trace_frame =
-            TraceOodFrame::new(ood_trace_evaluations, main_trace_width, aux_trace_width);
-
+        //let mut ood_traces_evaluations = Vec::new();
+        let mut ood_constraints_evaluations = Vec::new();
+        let mut ood_traces_frame = Vec::new();
+        for (i, ood_frame) in ood_frames.iter().enumerate() {
+            let (ood_trace_evaluations, ood_constraint_evaluations) = ood_frame
+                .to_owned()
+                .parse(
+                    main_traces_width[i],
+                    aux_traces_width[i],
+                    constraint_frames_width[i],
+                )
+                .map_err(|err| VerifierError::ProofDeserializationError(err.to_string()))?;
+            let ood_trace_frame = TraceOodFrame::new(
+                ood_trace_evaluations.to_owned(),
+                main_traces_width[i],
+                aux_traces_width[i],
+            );
+            //ood_traces_evaluations.push(ood_trace_evaluations);
+            ood_constraints_evaluations.push(ood_constraint_evaluations);
+            ood_traces_frame.push(Some(ood_trace_frame));
+        }
         Ok(VerifierChannel {
             // trace queries
             trace_roots,
@@ -113,8 +140,8 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
             fri_remainder: Some(fri_remainder),
             fri_num_partitions,
             // out-of-domain evaluation
-            ood_trace_frame: Some(ood_trace_frame),
-            ood_constraint_evaluations: Some(ood_constraint_evaluations),
+            ood_traces_frame,
+            ood_constraint_evaluations: Some(ood_constraints_evaluations[0].to_vec()),
             // query seed
             pow_nonce,
         })
@@ -141,8 +168,24 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     ///
     /// For computations requiring multiple trace segments, evaluations of auxiliary trace
     /// polynomials are also included.
-    pub fn read_ood_trace_frame(&mut self) -> TraceOodFrame<E> {
-        self.ood_trace_frame.take().expect("already read")
+    pub fn read_ood_traces_frame(&mut self) -> Vec<TraceOodFrame<E>> {
+        // Leaving this code here because I fear the filter map might not be quite what we want
+        // so it is nice to try it and see if the proof holds
+        /* let traces_ood_frame = self
+        .ood_traces_frame
+        .iter()
+        .map(|ood_trace_frame| {
+            let mut ood_trace_frame_mutable = ood_trace_frame.to_owned();
+            ood_trace_frame_mutable.take().expect("already read")
+        })
+        .collect(); */
+        let traces_ood_frame = self
+            .ood_traces_frame
+            .iter()
+            .filter_map(|x| x.as_ref())
+            .cloned()
+            .collect();
+        traces_ood_frame
     }
 
     /// Returns evaluations of composition polynomial columns at z^m, where z is the out-of-domain
@@ -168,16 +211,17 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> VerifierChanne
     pub fn read_queried_trace_states(
         &mut self,
         positions: &[usize],
-    ) -> Result<(Table<E::BaseField>, Option<Table<E>>), VerifierError> {
+    ) -> Result<(Vec<Table<E::BaseField>>, Option<Vec<Table<E>>>), VerifierError> {
         let queries = self.trace_queries.take().expect("already read");
-
+        //*****
+        //MerkleTree check needs to be modified
         // make sure the states included in the proof correspond to the trace commitment
         for (root, proof) in self.trace_roots.iter().zip(queries.query_proofs.iter()) {
             MerkleTree::verify_batch(root, positions, proof)
                 .map_err(|_| VerifierError::TraceQueryDoesNotMatchCommitment)?;
         }
-
-        Ok((queries.main_states, queries.aux_states))
+        //*/
+        Ok((queries.main_states_vec, queries.aux_states_vec))
     }
 
     /// Returns constraint evaluations at the specified positions of the LDE domain. This also
@@ -235,73 +279,120 @@ where
 /// * Merkle authentication paths for all queries.
 ///
 /// Trace states for all auxiliary segments are stored in a single table.
-struct TraceQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
+#[derive(Debug)]
+pub struct TraceQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     query_proofs: Vec<BatchMerkleProof<H>>,
-    main_states: Table<E::BaseField>,
-    aux_states: Option<Table<E>>,
+    comb_states: Table<E::BaseField>,
+    main_states_vec: Vec<Table<E::BaseField>>,
+    aux_states_vec: Option<Vec<Table<E>>>,
+}
+
+impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> Clone for TraceQueries<E, H> {
+    fn clone(&self) -> Self {
+        TraceQueries {
+            query_proofs: self.query_proofs.clone(),
+            comb_states: self.comb_states.clone(),
+            main_states_vec: self.main_states_vec.clone(),
+            aux_states_vec: self.aux_states_vec.clone(),
+        }
+    }
 }
 
 impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E, H> {
     /// Parses the provided trace queries into trace states in the specified field and
     /// corresponding Merkle authentication paths.
     pub fn new<A: Air<BaseField = E::BaseField>>(
-        mut queries: Vec<Queries>,
-        air: &A,
+        mut queries: Vec<JointTraceQueries>,
+        airs: &Vec<A>,
     ) -> Result<Self, VerifierError> {
-        assert_eq!(
-            queries.len(),
-            air.trace_layout().num_segments(),
-            "expected {} trace segment queries, but received {}",
-            air.trace_layout().num_segments(),
-            queries.len()
-        );
+        /*for air in airs.iter() {
+            assert_eq!(
+                queries.len(),
+                air.trace_layout().num_segments(),
+                "expected {} trace segment queries, but received {}",
+                air.trace_layout().num_segments(),
+                queries.len()
+            );
+        }*/
 
-        let num_queries = air.options().num_queries();
+        /////
+        let num_queries = airs[0].options().num_queries();
 
         // parse main trace segment queries; parsing also validates that hashes of each table row
         // form the leaves of Merkle authentication paths in the proofs
-        let main_segment_width = air.trace_layout().main_trace_width();
+        let main_segments_width = airs
+            .iter()
+            .map(|air| air.trace_layout().main_trace_width())
+            .collect();
         let main_segment_queries = queries.remove(0);
-        let (main_segment_query_proofs, main_segment_states) = main_segment_queries
-            .parse::<H, E::BaseField>(air.lde_domain_size(), num_queries, main_segment_width)
-            .map_err(|err| {
-                VerifierError::ProofDeserializationError(format!(
-                    "main trace segment query deserialization failed: {err}"
-                ))
-            })?;
+        let (main_segment_query_proofs, comb_segment_states, main_segments_states) =
+            main_segment_queries
+                .parse::<H, E::BaseField>(
+                    airs[0].lde_domain_size(),
+                    num_queries,
+                    main_segments_width,
+                )
+                .map_err(|err| {
+                    VerifierError::ProofDeserializationError(format!(
+                        "main trace segment query deserialization failed: {err}"
+                    ))
+                })?;
 
         // all query proofs will be aggregated into a single vector
         let mut query_proofs = vec![main_segment_query_proofs];
-
         // parse auxiliary trace segment queries (if any), and merge resulting tables into a
         // single table; parsing also validates that hashes of each table row form the leaves
         // of Merkle authentication paths in the proofs
-        let aux_trace_states = if air.trace_info().is_multi_segment() {
+        let aux_traces_states = if airs[0].trace_info().is_multi_segment() {
             let mut aux_trace_states = Vec::new();
+            let n = main_segments_states.len();
             for (i, segment_queries) in queries.into_iter().enumerate() {
-                let segment_width = air.trace_layout().get_aux_segment_width(i);
-                let (segment_query_proof, segment_trace_states) = segment_queries
-                    .parse::<H, E>(air.lde_domain_size(), num_queries, segment_width)
-                    .map_err(|err| {
-                        VerifierError::ProofDeserializationError(format!(
-                            "auxiliary trace segment query deserialization failed: {err}"
-                        ))
-                    })?;
+                let aux_segments_width = airs
+                    .iter()
+                    .map(|air| air.trace_layout().get_aux_segment_width(i))
+                    .collect();
+                let (segment_query_proof, aux_comb_trace_states, segment_traces_states) =
+                    segment_queries
+                        .parse::<H, E>(airs[0].lde_domain_size(), num_queries, aux_segments_width)
+                        .map_err(|err| {
+                            VerifierError::ProofDeserializationError(format!(
+                                "auxiliary trace segment query deserialization failed: {err}"
+                            ))
+                        })?;
 
                 query_proofs.push(segment_query_proof);
-                aux_trace_states.push(segment_trace_states);
+                aux_trace_states.push(segment_traces_states);
             }
 
             // merge tables for each auxiliary segment into a single table
-            Some(Table::merge(aux_trace_states))
+
+            //This may look extremly odd so here is an explanation
+            //Let's denote n = {The number of traces in starkpack}
+            //m = {The number of aux_segments in each trace}(We assume that the number of segmets is equall for each trace)
+            //The original Winterfell would iterate over m (line351) get the segments and merge them into one table.
+            //In our case during the each iteration we get not 1 segment but a pack of n segments
+            // so a matrix of size m*n
+            //but we need a matrix of size n*m
+            //that's why I rearrange the matrix m*n-> n*m
+            //And merge each row into a table.
+            let mut aux_traces_states = Vec::new();
+            for i in 0..n {
+                let mut aux_table_states = Vec::new();
+                for segment_traces_states in aux_trace_states.iter() {
+                    aux_table_states.push(segment_traces_states[i].to_owned());
+                }
+                aux_traces_states.push(Table::merge(aux_table_states))
+            }
+            Some(aux_traces_states)
         } else {
             None
         };
 
         Ok(Self {
             query_proofs,
-            main_states: main_segment_states,
-            aux_states: aux_trace_states,
+            comb_states: comb_segment_states,
+            main_states_vec: main_segments_states,
+            aux_states_vec: aux_traces_states,
         })
     }
 }
@@ -312,7 +403,8 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
 /// Container of constraint evaluation query data, including:
 /// * Queried constraint evaluation values.
 /// * Merkle authentication paths for all queries.
-struct ConstraintQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
+#[derive(Debug, Clone)]
+pub struct ConstraintQueries<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     query_proofs: BatchMerkleProof<H>,
     evaluations: Table<E>,
 }
@@ -344,7 +436,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> ConstraintQuer
 
 // TRACE OUT-OF-DOMAIN FRAME
 // ================================================================================================
-
+#[derive(Debug, Clone)]
 pub struct TraceOodFrame<E: FieldElement> {
     values: Vec<E>,
     main_trace_width: usize,

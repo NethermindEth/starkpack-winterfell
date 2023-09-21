@@ -82,7 +82,7 @@ pub use errors::VerifierError;
 #[rustfmt::skip]
 pub fn verify<AIR, HashFn, RandCoin>(
     proof: StarkProof,
-    pub_inputs: AIR::PublicInputs,
+    pub_inputs_vec: Vec<AIR::PublicInputs>,
 ) -> Result<(), VerifierError> 
 where 
     AIR: Air, 
@@ -92,35 +92,45 @@ where
     // build a seed for the public coin; the initial seed is a hash of the proof context and the
     // public inputs, but as the protocol progresses, the coin will be reseeded with the info
     // received from the prover
-    let mut public_coin_seed = proof.context.to_elements();
-    public_coin_seed.append(&mut pub_inputs.to_elements());
+    let mut public_coin_seed = proof.contexts[0].to_elements();
+    for pub_inputs in pub_inputs_vec.iter(){
+        public_coin_seed.append(&mut pub_inputs.to_elements());
+    }
     
     // create AIR instance for the computation specified in the proof
-    let air = AIR::new(proof.get_trace_info(), pub_inputs, proof.options().clone());
+    let airs: Vec<_> = pub_inputs_vec.into_iter().enumerate().map(|(i, pub_inputs)| AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).to_owned())).collect();
 
     // figure out which version of the generic proof verification procedure to run. this is a sort
     // of static dispatch for selecting two generic parameter: extension field and hash function.
-    match air.options().field_extension() {
+    match airs[0].options().field_extension() {
         FieldExtension::None => {
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&air, proof)?;
-            perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(air, channel, public_coin)
+            match VerifierChannel::new(&airs, proof) {
+                Ok(channel) => {
+                    perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(&airs, channel, public_coin)
+                },
+                Err(err) => {
+                    println!("Err: {}", err);
+                    Err(err)
+                },
+            }
         },
         FieldExtension::Quadratic => {
             if !<QuadExtension<AIR::BaseField>>::is_supported() {
                 return Err(VerifierError::UnsupportedFieldExtension(2));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&air, proof)?;
-            perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(air, channel, public_coin)
+            let channel = VerifierChannel::new(&airs, proof)?;
+            perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(&airs, channel, public_coin)
         },
         FieldExtension::Cubic => {
             if !<CubeExtension<AIR::BaseField>>::is_supported() {
                 return Err(VerifierError::UnsupportedFieldExtension(3));
             }
             let public_coin = RandCoin::new(&public_coin_seed);
-            let channel = VerifierChannel::new(&air, proof)?;
-            perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(air, channel, public_coin)
+            let channel = VerifierChannel::new(&
+                airs, proof)?;
+            perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(&airs, channel, public_coin)
         },
     }
 }
@@ -130,7 +140,7 @@ where
 /// Performs the actual verification by reading the data from the `channel` and making sure it
 /// attests to a correct execution of the computation specified by the provided `air`.
 fn perform_verification<A, E, H, R>(
-    air: A,
+    airs: &Vec<A>,
     mut channel: VerifierChannel<E, H>,
     mut public_coin: R,
 ) -> Result<(), VerifierError>
@@ -153,34 +163,43 @@ where
 
     // reseed the coin with the commitment to the main trace segment
     public_coin.reseed(trace_commitments[0]);
-
     // process auxiliary trace segments (if any), to build a set of random elements for each segment
-    let mut aux_trace_rand_elements = AuxTraceRandElements::<E>::new();
-    for (i, commitment) in trace_commitments.iter().skip(1).enumerate() {
-        let rand_elements = air
-            .get_aux_trace_segment_random_elements(i, &mut public_coin)
-            .map_err(|_| VerifierError::RandomCoinError)?;
-        aux_trace_rand_elements.add_segment_elements(rand_elements);
-        public_coin.reseed(*commitment);
+    let mut aux_traces_rand_elements = Vec::new();
+    for air in airs.iter() {
+        let mut aux_trace_rand_elements = AuxTraceRandElements::<E>::new();
+        for (i, commitment) in trace_commitments.iter().skip(1).enumerate() {
+            let rand_elements = air
+                .get_aux_trace_segment_random_elements(i, &mut public_coin)
+                .map_err(|_| VerifierError::RandomCoinError)?;
+            aux_trace_rand_elements.add_segment_elements(rand_elements);
+            public_coin.reseed(*commitment);
+        }
+        aux_traces_rand_elements.push(aux_trace_rand_elements);
     }
-
     // build random coefficients for the composition polynomial
-    let constraint_coeffs = air
-        .get_constraint_composition_coefficients(&mut public_coin)
-        .map_err(|_| VerifierError::RandomCoinError)?;
-
+    let mut constraints_coeffs = Vec::new();
+    for air in airs.iter() {
+        constraints_coeffs.push(
+            air.get_constraint_composition_coefficients(&mut public_coin)
+                .map_err(|_| VerifierError::RandomCoinError)?,
+        )
+    }
     // 2 ----- constraint commitment --------------------------------------------------------------
     // read the commitment to evaluations of the constraint composition polynomial over the LDE
     // domain sent by the prover, use it to update the public coin, and draw an out-of-domain point
     // z from the coin; in the interactive version of the protocol, the verifier sends this point z
     // to the prover, and the prover evaluates trace and constraint composition polynomials at z,
     // and sends the results back to the verifier.
-    let constraint_commitment = channel.read_constraint_commitment();
-    public_coin.reseed(constraint_commitment);
-    let z = public_coin
+    let final_coeff: E = public_coin
         .draw::<E>()
         .map_err(|_| VerifierError::RandomCoinError)?;
-
+    let constraint_commitment = channel.read_constraint_commitment();
+    public_coin.reseed(constraint_commitment);
+    //let constraint_commitment1 = channel.read_constraint_commitment();
+    //public_coin.reseed(constraint_commitment1);
+    let z: E = public_coin
+        .draw::<E>()
+        .map_err(|_| VerifierError::RandomCoinError)?;
     // 3 ----- OOD consistency check --------------------------------------------------------------
     // make sure that evaluations obtained by evaluating constraints over the out-of-domain frame
     // are consistent with the evaluations of composition polynomial columns sent by the prover
@@ -188,18 +207,32 @@ where
     // read the out-of-domain trace frames (the main trace frame and auxiliary trace frame, if
     // provided) sent by the prover and evaluate constraints over them; also, reseed the public
     // coin with the OOD frames received from the prover.
-    let ood_trace_frame = channel.read_ood_trace_frame();
-    let ood_main_trace_frame = ood_trace_frame.main_frame();
-    let ood_aux_trace_frame = ood_trace_frame.aux_frame();
-    let ood_constraint_evaluation_1 = evaluate_constraints(
-        &air,
-        constraint_coeffs,
-        &ood_main_trace_frame,
-        &ood_aux_trace_frame,
-        aux_trace_rand_elements,
-        z,
-    );
-    public_coin.reseed(H::hash_elements(ood_trace_frame.values()));
+    let ood_traces_frame = channel.read_ood_traces_frame();
+    let mut ood_constraint_evaluation = E::ZERO;
+    let ood_main_traces_frame: Vec<_> = ood_traces_frame
+        .iter()
+        .map(|ood_trace_frame| ood_trace_frame.main_frame())
+        .collect();
+    let ood_aux_traces_frame: Vec<_> = ood_traces_frame
+        .iter()
+        .map(|ood_trace_frame| ood_trace_frame.aux_frame())
+        .collect();
+    for i in 0..ood_traces_frame.len() {
+        let constraints_coeffs_i = &constraints_coeffs[i];
+        let aux_trace_rand_elements_i = &aux_traces_rand_elements[i];
+        let ood_constraint_evaluation_1 = evaluate_constraints(
+            &airs[i],
+            constraints_coeffs_i.to_owned(),
+            &ood_main_traces_frame[i],
+            &ood_aux_traces_frame[i],
+            aux_trace_rand_elements_i.to_owned(),
+            z,
+        );
+        public_coin.reseed(H::hash_elements(ood_traces_frame[i].values()));
+        let j = i as u32;
+        ood_constraint_evaluation +=
+            ood_constraint_evaluation_1 * final_coeff.exp_vartime(E::PositiveInteger::from(j));
+    }
 
     // read evaluations of composition polynomial columns sent by the prover, and reduce them into
     // a single value by computing \sum_{i=0}^{m-1}(z^(i * l) * value_i), where value_i is the
@@ -214,22 +247,21 @@ where
             .iter()
             .enumerate()
             .fold(E::ZERO, |result, (i, &value)| {
-                result + z.exp_vartime(((i * (air.trace_length())) as u32).into()) * value
+                result + z.exp_vartime(((i * (airs[0].trace_length())) as u32).into()) * value
             });
     public_coin.reseed(H::hash_elements(&ood_constraint_evaluations));
 
     // finally, make sure the values are the same
-    if ood_constraint_evaluation_1 != ood_constraint_evaluation_2 {
+    if ood_constraint_evaluation != ood_constraint_evaluation_2 {
         return Err(VerifierError::InconsistentOodConstraintEvaluations);
     }
-
     // 4 ----- FRI commitments --------------------------------------------------------------------
     // draw coefficients for computing DEEP composition polynomial from the public coin; in the
     // interactive version of the protocol, the verifier sends these coefficients to the prover
     // and the prover uses them to compute the DEEP composition polynomial. the prover, then
     // applies FRI protocol to the evaluations of the DEEP composition polynomial.
-    let deep_coefficients = air
-        .get_deep_composition_coefficients::<E, R>(&mut public_coin)
+    let deep_coefficients: DeepCompositionCoefficients<E> = airs[0]
+        .get_deep_composition_coefficients::<A, E, R>(airs, &mut public_coin)
         .map_err(|_| VerifierError::RandomCoinError)?;
 
     // instantiates a FRI verifier with the FRI layer commitments read from the channel. From the
@@ -240,8 +272,8 @@ where
     let fri_verifier = FriVerifier::new(
         &mut channel,
         &mut public_coin,
-        air.options().to_fri_options(),
-        air.trace_poly_degree(),
+        airs[0].options().to_fri_options(),
+        airs[0].trace_poly_degree(),
     )
     .map_err(VerifierError::FriVerificationFailed)?;
     // TODO: make sure air.lde_domain_size() == fri_verifier.domain_size()
@@ -252,7 +284,7 @@ where
     public_coin.reseed_with_int(pow_nonce);
 
     // make sure the proof-of-work specified by the grinding factor is satisfied
-    if public_coin.leading_zeros() < air.options().grinding_factor() {
+    if public_coin.leading_zeros() < airs[0].options().grinding_factor() {
         return Err(VerifierError::QuerySeedProofOfWorkVerificationFailed);
     }
 
@@ -261,28 +293,27 @@ where
     // and the prover responds with decommitments against these positions for trace and constraint
     // composition polynomial evaluations.
     let query_positions = public_coin
-        .draw_integers(air.options().num_queries(), air.lde_domain_size())
+        .draw_integers(airs[0].options().num_queries(), airs[0].lde_domain_size())
         .map_err(|_| VerifierError::RandomCoinError)?;
 
     // read evaluations of trace and constraint composition polynomials at the queried positions;
     // this also checks that the read values are valid against trace and constraint commitments
-    let (queried_main_trace_states, queried_aux_trace_states) =
+    let (queried_main_trace_states_vec, queried_aux_traces_states) =
         channel.read_queried_trace_states(&query_positions)?;
     let queried_constraint_evaluations = channel.read_constraint_evaluations(&query_positions)?;
 
     // 6 ----- DEEP composition -------------------------------------------------------------------
     // compute evaluations of the DEEP composition polynomial at the queried positions
-    let composer = DeepComposer::new(&air, &query_positions, z, deep_coefficients);
+    let composer = DeepComposer::new(&airs[0], &query_positions, z, deep_coefficients);
     let t_composition = composer.compose_trace_columns(
-        queried_main_trace_states,
-        queried_aux_trace_states,
-        ood_main_trace_frame,
-        ood_aux_trace_frame,
+        queried_main_trace_states_vec,
+        queried_aux_traces_states,
+        ood_main_traces_frame,
+        ood_aux_traces_frame,
     );
     let c_composition = composer
         .compose_constraint_evaluations(queried_constraint_evaluations, ood_constraint_evaluations);
     let deep_evaluations = composer.combine_compositions(t_composition, c_composition);
-
     // 7 ----- Verify low-degree proof -------------------------------------------------------------
     // make sure that evaluations of the DEEP composition polynomial we computed in the previous
     // step are in fact evaluations of a polynomial of degree equal to trace polynomial degree

@@ -62,79 +62,93 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
     /// parameter.
     pub fn add_trace_polys(
         &mut self,
-        trace_polys: TracePolyTable<E>,
-        ood_trace_states: Vec<Vec<E>>,
+        traces_polys: Vec<TracePolyTable<E>>,
+        ood_traces_states: Vec<Vec<Vec<E>>>,
     ) {
-        assert!(self.coefficients.is_empty());
+        //assert!(self.coefficients.is_empty());
+        let mut trace_poly_vec = Vec::new();
+        for (index, trace_polys) in traces_polys.iter().enumerate()
+        //.zip(ood_traces_states.iter())
+        {
+            // compute a second out-of-domain point offset from z by exactly trace generator; this
+            // point defines the "next" computation state in relation to point z
+            let trace_length = trace_polys.poly_size();
+            let g = E::from(E::BaseField::get_root_of_unity(trace_length.ilog2()));
+            let next_z = self.z * g;
+            // combine trace polynomials into 2 composition polynomials T'(x) and T''(x)
+            let mut t1_composition = E::zeroed_vector(trace_length);
+            let mut t2_composition = E::zeroed_vector(trace_length);
 
-        // compute a second out-of-domain point offset from z by exactly trace generator; this
-        // point defines the "next" computation state in relation to point z
-        let trace_length = trace_polys.poly_size();
-        let g = E::from(E::BaseField::get_root_of_unity(trace_length.ilog2()));
-        let next_z = self.z * g;
+            // index of a trace polynomial; we declare it here so that we can maintain index continuity
+            // across all trace segments
+            let mut i = 0;
 
-        // combine trace polynomials into 2 composition polynomials T'(x) and T''(x)
-        let mut t1_composition = E::zeroed_vector(trace_length);
-        let mut t2_composition = E::zeroed_vector(trace_length);
+            // --- merge polynomials of the main trace segment ----------------------------------------
+            for poly in trace_polys.main_trace_polys() {
+                // compute T'(x) = T(x) - T(z), multiply it by a pseudo-random coefficient,
+                // and add the result into composition polynomial
+                acc_trace_poly::<E::BaseField, E>(
+                    &mut t1_composition,
+                    poly,
+                    ood_traces_states[index][0][i],
+                    self.cc.traces[index][i],
+                );
 
-        // index of a trace polynomial; we declare it here so that we can maintain index continuity
-        // across all trace segments
-        let mut i = 0;
+                // compute T''(x) = T(x) - T(z * g), multiply it by a pseudo-random coefficient,
+                // and add the result into composition polynomial
+                acc_trace_poly::<E::BaseField, E>(
+                    &mut t2_composition,
+                    poly,
+                    ood_traces_states[index][1][i],
+                    self.cc.traces[index][i],
+                );
 
-        // --- merge polynomials of the main trace segment ----------------------------------------
-        for poly in trace_polys.main_trace_polys() {
-            // compute T'(x) = T(x) - T(z), multiply it by a pseudo-random coefficient,
-            // and add the result into composition polynomial
-            acc_trace_poly::<E::BaseField, E>(
-                &mut t1_composition,
-                poly,
-                ood_trace_states[0][i],
-                self.cc.trace[i],
+                i += 1;
+            }
+            // --- merge polynomials of the auxiliary trace segments ----------------------------------
+            for poly in trace_polys.aux_trace_polys() {
+                // compute T'(x) = T(x) - T(z), multiply it by a pseudo-random coefficient,
+                // and add the result into composition polynomial
+                acc_trace_poly::<E, E>(
+                    &mut t1_composition,
+                    poly,
+                    ood_traces_states[index][0][i],
+                    self.cc.traces[index][i],
+                );
+
+                // compute T''(x) = T(x) - T(z * g), multiply it by a pseudo-random coefficient,
+                // and add the result into composition polynomial
+                acc_trace_poly::<E, E>(
+                    &mut t2_composition,
+                    poly,
+                    ood_traces_states[index][1][i],
+                    self.cc.traces[index][i],
+                );
+
+                i += 1;
+            }
+            // divide the composition polynomials by (x - z) and (x - z * g), respectively,
+            // and add the resulting polynomials together; the output of this step
+            // is a single trace polynomial T(x) and deg(T(x)) = trace_length - 2.
+
+            //Not sure if this works
+            let trace_poly = merge_trace_compositions(
+                vec![t1_composition, t2_composition],
+                vec![self.z, next_z],
             );
-
-            // compute T''(x) = T(x) - T(z * g), multiply it by a pseudo-random coefficient,
-            // and add the result into composition polynomial
-            acc_trace_poly::<E::BaseField, E>(
-                &mut t2_composition,
-                poly,
-                ood_trace_states[1][i],
-                self.cc.trace[i],
-            );
-
-            i += 1;
+            trace_poly_vec.push(trace_poly);
         }
-
-        // --- merge polynomials of the auxiliary trace segments ----------------------------------
-        for poly in trace_polys.aux_trace_polys() {
-            // compute T'(x) = T(x) - T(z), multiply it by a pseudo-random coefficient,
-            // and add the result into composition polynomial
-            acc_trace_poly::<E, E>(
-                &mut t1_composition,
-                poly,
-                ood_trace_states[0][i],
-                self.cc.trace[i],
-            );
-
-            // compute T''(x) = T(x) - T(z * g), multiply it by a pseudo-random coefficient,
-            // and add the result into composition polynomial
-            acc_trace_poly::<E, E>(
-                &mut t2_composition,
-                poly,
-                ood_trace_states[1][i],
-                self.cc.trace[i],
-            );
-
-            i += 1;
-        }
-
-        // divide the composition polynomials by (x - z) and (x - z * g), respectively,
-        // and add the resulting polynomials together; the output of this step
-        // is a single trace polynomial T(x) and deg(T(x)) = trace_length - 2.
-        let trace_poly =
-            merge_trace_compositions(vec![t1_composition, t2_composition], vec![self.z, next_z]);
-
+        let first_poly = trace_poly_vec.first().unwrap().to_owned();
+        let rem_polys: Vec<_> = trace_poly_vec.iter().skip(1).collect();
+        let final_trace_poly = rem_polys
+            .into_iter()
+            .fold(first_poly, |mut acc, next_poly| {
+                add_in_place(&mut acc, &next_poly);
+                acc
+            });
         // set the coefficients of the DEEP composition polynomial
-        self.coefficients = trace_poly;
+        self.coefficients = final_trace_poly;
+        // TODO^ Check again here
         assert_eq!(self.poly_size() - 2, self.degree());
     }
 

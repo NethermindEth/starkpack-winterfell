@@ -528,6 +528,8 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub use crate::crypto::{hashers::Blake3_256, DefaultRandomCoin};
+pub use crate::math::{fields::f128::BaseElement, FieldElement, ToElements};
 pub use prover::{
     crypto, iterators, math, Air, AirContext, Assertion, AuxTraceRandElements, BoundaryConstraint,
     BoundaryConstraintGroup, ByteReader, ByteWriter, ColMatrix, ConstraintCompositionCoefficients,

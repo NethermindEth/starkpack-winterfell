@@ -120,6 +120,7 @@ pub trait ByteReader {
 // ================================================================================================
 
 /// Implements [ByteReader] trait for a slice of bytes.
+#[derive(Debug)]
 pub struct SliceReader<'a> {
     source: &'a [u8],
     pos: usize,

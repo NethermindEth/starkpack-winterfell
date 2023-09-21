@@ -17,6 +17,7 @@ use utils::collections::Vec;
 ///   will always be elements in the base field (even when an extension field is used).
 /// - Auxiliary segments: a list of 0 or more segments for traces generated after the prover
 ///   commits to the first trace segment. Currently, at most 1 auxiliary segment is possible.
+#[derive(Clone)]
 pub struct TraceLde<E: FieldElement> {
     main_segment_lde: RowMatrix<E::BaseField>,
     aux_segment_ldes: Vec<RowMatrix<E>>,
