@@ -14,7 +14,7 @@ pub use verifier::{verify, VerifierError};
 
 fn main() {
     pub fn build_do_work_trace(start: BaseElement, n: usize) -> TraceTable<BaseElement> {
-        let trace_width: usize = 1;
+        let trace_width: usize = 275;
         let mut trace = TraceTable::new(trace_width, n);
         trace.fill(
             |state| {
@@ -47,7 +47,7 @@ fn main() {
         type BaseField = BaseElement;
         type PublicInputs = PublicInputs;
         fn new(trace_info: TraceInfo, pub_inputs: PublicInputs, options: ProofOptions) -> Self {
-            assert_eq!(1, trace_info.width());
+            assert_eq!(275, trace_info.width());
             let degrees = vec![TransitionConstraintDegree::new(3)];
             WorkAir {
                 context: AirContext::new(trace_info, degrees, 2, options),
@@ -102,59 +102,59 @@ fn main() {
         }
     }
 
-    let starting_vec: Vec<_> = (0..2_u128.pow(5)).map(|i| BaseElement::new(i)).collect();
-    let m = 1024;
-    let n = starting_vec.len();
-    // Build the execution trace and get the result from the last step.
-    let now: Instant = Instant::now();
-    let traces: Vec<_> = starting_vec
-        .iter()
-        .map(|&start| build_do_work_trace(start, m))
-        .collect();
-    println!("Built execution Traces in {}ms", now.elapsed().as_millis());
+    for j in 1..=10 {
+        let starting_vec: Vec<_> = (0..j).map(|_| BaseElement::new(3)).collect();
+        let m = 1024 * 64;
+        let n = starting_vec.len();
+        // Build the execution trace and get the result from the last step.
+        let traces: Vec<_> = starting_vec
+            .iter()
+            .map(|&start| build_do_work_trace(start, m))
+            .collect();
 
-    let results: Vec<_> = traces.iter().map(|trace| trace.get(0, m - 1)).collect();
-    // Define proof options; these will be enough for ~96-bit security level.
-    let options = ProofOptions::new(
-        32, // number of queries
-        8,  // blowup factor
-        0,  // grinding factor
-        FieldExtension::None,
-        8,  // FRI folding factor
-        31, // FRI max remainder polynomial degree
-    );
-    // Instantiate the prover and generate the proof.
-    let prover = WorkProver::new(options);
-    let now: Instant = Instant::now();
-    let proof = prover.prove(n, traces).unwrap();
-    println!("Generated the proof in {}ms", now.elapsed().as_millis());
+        let results: Vec<_> = traces.iter().map(|trace| trace.get(0, m - 1)).collect();
+        // Define proof options; these will be enough for ~96-bit security level.
+        let options = ProofOptions::new(
+            32, // number of queries
+            8,  // blowup factor
+            0,  // grinding factor
+            FieldExtension::None,
+            8,  // FRI folding factor
+            31, // FRI max remainder polynomial degree
+        );
+        // Instantiate the prover and generate the proof.
+        let prover = WorkProver::new(options);
+        let now: Instant = Instant::now();
+        let proof = prover.prove(n, traces).unwrap();
+        println!("Generated the proof in {}ms", now.elapsed().as_millis());
 
-    let proof_bytes: Vec<u8> = proof.to_bytes();
-    println!("Proof size: {:.1} KB", proof_bytes.len() as f64 / 1024f64);
-    //println!("Proof Security: {} bits", proof.security_level(true));
+        let proof_bytes: Vec<u8> = proof.to_bytes();
+        println!("Proof size: {:.1} KB", proof_bytes.len() as f64 / 1024f64);
+        //println!("Proof Security: {} bits", proof.security_level(true));
 
-    //let parsed_proof: StarkProof = StarkProof::from_bytes(&proof_bytes).unwrap();
-    //assert_eq!(proof, parsed_proof);
-    // Verify the proof. The number of steps and options are encoded in the proof itself,
-    // so we don't need to pass them explicitly to the verifier.
-    let pub_inputs_vec = starting_vec
-        .into_iter()
-        .zip(results.into_iter())
-        .map(|(start, result)| PublicInputs { start, result })
-        .collect();
-    let now: Instant = Instant::now();
-    match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
-        proof,
-        pub_inputs_vec,
-    ) {
-        Ok(_) => {
-            println!(
-                "Proof verified in {:.1} ms",
-                now.elapsed().as_micros() as f64 / 1000f64
-            );
-        }
-        Err(err) => {
-            println!("Proof is not valid\nErr: {}", err);
+        //let parsed_proof: StarkProof = StarkProof::from_bytes(&proof_bytes).unwrap();
+        //assert_eq!(proof, parsed_proof);
+        // Verify the proof. The number of steps and options are encoded in the proof itself,
+        // so we don't need to pass them explicitly to the verifier.
+        let pub_inputs_vec = starting_vec
+            .into_iter()
+            .zip(results.into_iter())
+            .map(|(start, result)| PublicInputs { start, result })
+            .collect();
+        let now: Instant = Instant::now();
+        match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
+            proof,
+            pub_inputs_vec,
+        ) {
+            Ok(_) => {
+                println!(
+                    "Proof verified in {:.1} ms",
+                    now.elapsed().as_micros() as f64 / 1000f64
+                );
+            }
+            Err(err) => {
+                println!("Proof is not valid\nErr: {}", err);
+            }
         }
     }
 }
