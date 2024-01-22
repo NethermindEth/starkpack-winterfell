@@ -26,10 +26,11 @@ impl<H: ElementHasher> DoWorkProver<H> {
         &self,
         starting_vec: &Vec<BaseElement>,
         trace_lenght: usize,
+        trace_width: usize,
     ) -> Vec<TraceTable<BaseElement>> {
         starting_vec
             .iter()
-            .map(|&start| build_do_work_trace(start, trace_lenght))
+            .map(|&start| build_do_work_trace(start, trace_lenght, trace_width))
             .collect()
     }
 }
@@ -59,8 +60,7 @@ where
     }
 }
 
-fn build_do_work_trace(start: BaseElement, trace_lenght: usize) -> TraceTable<BaseElement> {
-    let trace_width = 10;
+fn build_do_work_trace(start: BaseElement, trace_lenght: usize, trace_width: usize) -> TraceTable<BaseElement> {
     let mut trace = TraceTable::new(trace_width, trace_lenght);
     trace.fill(
         |state| {

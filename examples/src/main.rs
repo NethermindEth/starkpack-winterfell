@@ -36,7 +36,8 @@ fn main() {
         ExampleType::DoWork {
             num_traces,
             trace_lenght,
-        } => do_work::get_example(&options, num_traces, trace_lenght),
+            trace_width,
+        } => do_work::get_example(&options, num_traces, trace_lenght, trace_width),
     }
     .expect("The example failed to initialize.");
 

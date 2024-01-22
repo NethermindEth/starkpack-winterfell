@@ -132,6 +132,8 @@ pub enum ExampleType {
         num_traces: usize,
         #[structopt(short = "l", long = "traces_len", default_value = "1024")]
         trace_lenght: usize,
+        #[structopt(short = "w", long = "traces_len", default_value = "10")]
+        trace_width: usize,
     },
 }
 

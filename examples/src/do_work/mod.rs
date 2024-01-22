@@ -19,6 +19,7 @@ pub fn get_example(
     options: &ExampleOptions,
     num_traces: usize,
     trace_lenght: usize,
+    trace_width: usize,
 ) -> Result<Box<dyn Example>, String> {
     let (options, hash_fn) = options.to_proof_options(31, 8);
     println!("Getting example");
@@ -27,16 +28,19 @@ pub fn get_example(
         HashFunction::Blake3_192 => Ok(Box::new(DoWorkExample::<Blake3_192>::new(
             num_traces,
             trace_lenght,
+            trace_width,
             options,
         ))),
         HashFunction::Blake3_256 => Ok(Box::new(DoWorkExample::<Blake3_256>::new(
             num_traces,
             trace_lenght,
+            trace_width,
             options,
         ))),
         HashFunction::Sha3_256 => Ok(Box::new(DoWorkExample::<Sha3_256>::new(
             num_traces,
             trace_lenght,
+            trace_width,
             options,
         ))),
         _ => Err("The specified hash function cannot be used with this example.".to_string()),
@@ -48,11 +52,12 @@ pub struct DoWorkExample<H: ElementHasher> {
     starting_vec: Vec<BaseElement>,
     results: Vec<BaseElement>,
     trace_lenght: usize,
+    trace_width: usize,
     _hasher: PhantomData<H>,
 }
 
 impl<H: ElementHasher> DoWorkExample<H> {
-    pub fn new(num_traces: usize, trace_lenght: usize, options: ProofOptions) -> Self {
+    pub fn new(num_traces: usize, trace_lenght: usize, trace_width: usize, options: ProofOptions) -> Self {
         let starting_vec: Vec<_> = (0..num_traces as u128)
             .into_iter()
             .map(|i| BaseElement::new(i))
@@ -63,6 +68,7 @@ impl<H: ElementHasher> DoWorkExample<H> {
             starting_vec,
             results,
             trace_lenght,
+            trace_width,
             _hasher: PhantomData,
         }
     }
@@ -96,7 +102,8 @@ where
 
         // Generate traces
         let now = Instant::now();
-        let traces = prover.build_do_work_traces(&self.starting_vec, self.trace_lenght);
+        let traces = prover.build_do_work_traces(&self.starting_vec, self.trace_lenght, self.trace_width);
+        println!("Number of columns: {:?}", traces[0].width());
         debug!(
             "Generated execution trace of {} registers and 2^{} steps in {} ms",
             traces[0].width(),
