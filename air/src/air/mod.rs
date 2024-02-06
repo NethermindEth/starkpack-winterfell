@@ -210,7 +210,7 @@ pub trait Air: Send + Sync {
     /// (when extension fields are used).
     fn evaluate_transition<E: FieldElement<BaseField = Self::BaseField>>(
         &self,
-        frame: &EvaluationFrame<E>,
+        frames: Vec<&EvaluationFrame<E>>,
         periodic_values: &[E],
         result: &mut [E],
     );

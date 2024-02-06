@@ -164,7 +164,7 @@ pub trait Prover {
     /// secret and public inputs. Public inputs must match the value returned from
     /// [Self::get_pub_inputs()](Prover::get_pub_inputs) for the provided trace.
     #[rustfmt::skip]
-    fn prove(&self, n:usize, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
+    fn prove(&self, n:usize, traces: Vec<Vec<Self::Trace>>) -> Result<StarkProof, ProverError> {
         // figure out which version of the generic proof generation procedure to run. this is a sort
         // of static dispatch for selecting two generic parameter: extension field and hash function.
         match self.options().field_extension() {
@@ -194,7 +194,7 @@ pub trait Prover {
     fn generate_proof<E>(
         &self,
         n: usize,
-        mut traces: Vec<Self::Trace>,
+        mut traces: Vec<Vec<Self::Trace>>,
     ) -> Result<StarkProof, ProverError>
     where
         E: FieldElement<BaseField = Self::BaseField>,
@@ -214,13 +214,15 @@ pub trait Prover {
         // create an instance of AIR for the provided parameters. this takes a generic description
         // of the computation (provided via AIR type), and creates a description of a specific
         // execution of the computation for the provided public inputs.
-        let airs = traces
-            .iter()
-            .zip(pub_inputs_vec)
-            .map(|(trace, pub_inputs)| {
-                Self::Air::new(trace.get_info(), pub_inputs, self.options().clone())
-            })
-            .collect();
+        //let airs = traces
+        //    .iter()
+        //    .zip(pub_inputs_vec)
+        //    .map(|(trace, pub_inputs)| {
+        //        Self::Air::new(trace.get_info(), pub_inputs, self.options().clone())
+        //    })
+        //    .collect();
+        let airs = Vec::new();
+        for (trace, pub_inputs) in traces.iter().zip(pub_inputs_vec) {}
 
         // create a channel which is used to simulate interaction between the prover and the
         // verifier; the channel will be used to commit to values and to draw randomness that
