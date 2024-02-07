@@ -17,7 +17,7 @@ fn main() {
         start: BaseElement,
         n: usize,
         k: usize,
-    ) -> Vec<TraceTable<BaseElement>> {
+    ) -> Vec<&TraceTable<BaseElement>> {
         let trace_width: usize = 275;
         let len = n / k;
         let mut sub_traces = Vec::with_capacity(k);
@@ -33,7 +33,7 @@ fn main() {
                 },
             );
             cur_start = trace.get(0, len - 1);
-            sub_traces.push(trace);
+            sub_traces.push(&trace);
         }
         sub_traces
     }
@@ -80,12 +80,15 @@ fn main() {
                 results[i][0] = frame.next()[0] - next_state;
             }
         }
-        fn get_assertions(&self) -> Vec<Assertion<Self::BaseField>> {
+        fn get_assertions(&self, i: usize, k: usize) -> Vec<Assertion<Self::BaseField>> {
             let last_step = self.trace_length() - 1;
-            vec![
-                Assertion::single(0, 0, self.start),
-                Assertion::single(0, last_step, self.result),
-            ]
+            if i == 0 {
+                vec![Assertion::single(0, 0, self.start)]
+            }
+            if i == k {
+                vec![Assertion::single(0, last_step, self.result)]
+            }
+            vec![]
         }
         fn context(&self) -> &AirContext<Self::BaseField> {
             &self.context
@@ -105,12 +108,12 @@ fn main() {
         type Trace = TraceTable<Self::BaseField>;
         type HashFn = Blake3_256<Self::BaseField>;
         type RandomCoin = DefaultRandomCoin<Self::HashFn>;
-        fn get_pub_inputs(&self, traces: Vec<&Self::Trace>) -> PublicInputs {
-            let k = traces.len();
-            let last_step = traces[k].length() - 1;
+        fn get_pub_inputs(&self, sub_traces: Vec<&Self::Trace>) -> PublicInputs {
+            let k = sub_traces.len();
+            let last_step = sub_traces[k].length() - 1;
             PublicInputs {
-                start: traces[0].get(0, 0),
-                result: traces[k].get(0, last_step),
+                start: sub_traces[0].get(0, 0),
+                result: sub_traces[k].get(0, last_step),
             }
         }
         fn options(&self) -> &ProofOptions {
@@ -146,7 +149,7 @@ fn main() {
     // Instantiate the prover and generate the proof.
     let prover = WorkProver::new(options);
     let now: Instant = Instant::now();
-    let proof = prover.prove(n, traces).unwrap();
+    let proof = prover.prove(k, n, traces).unwrap();
     println!("Generated the proof in {}ms", now.elapsed().as_millis());
 
     let proof_bytes: Vec<u8> = proof.to_bytes();

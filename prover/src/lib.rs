@@ -144,7 +144,10 @@ pub trait Prover {
     /// trace.
     ///
     /// Public inputs need to be shared with the verifier in order for them to verify a proof.
-    fn get_pub_inputs(&self, trace: &Self::Trace) -> <<Self as Prover>::Air as Air>::PublicInputs;
+    fn get_pub_inputs(
+        &self,
+        sub_traces: Vec<&Self::Trace>,
+    ) -> <<Self as Prover>::Air as Air>::PublicInputs;
 
     /// Returns [ProofOptions] which this prover uses to generate STARK proofs.
     ///
@@ -164,22 +167,22 @@ pub trait Prover {
     /// secret and public inputs. Public inputs must match the value returned from
     /// [Self::get_pub_inputs()](Prover::get_pub_inputs) for the provided trace.
     #[rustfmt::skip]
-    fn prove(&self, n:usize, traces: Vec<Vec<Self::Trace>>) -> Result<StarkProof, ProverError> {
+    fn prove(&self, k:usize, n:usize, traces: Vec<Vec<&Self::Trace>>) -> Result<StarkProof, ProverError> {
         // figure out which version of the generic proof generation procedure to run. this is a sort
         // of static dispatch for selecting two generic parameter: extension field and hash function.
         match self.options().field_extension() {
-            FieldExtension::None => self.generate_proof::<Self::BaseField>(n, traces),
+            FieldExtension::None => self.generate_proof::<Self::BaseField>(k,n, traces),
             FieldExtension::Quadratic => {
                 if !<QuadExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(2));
                 }
-                self.generate_proof::<QuadExtension<Self::BaseField>>(n, traces)
+                self.generate_proof::<QuadExtension<Self::BaseField>>(k,n, traces)
             }
             FieldExtension::Cubic => {
                 if !<CubeExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(3));
                 }
-                self.generate_proof::<CubeExtension<Self::BaseField>>(n, traces)
+                self.generate_proof::<CubeExtension<Self::BaseField>>(k,n, traces)
             }
         }
     }
@@ -193,8 +196,9 @@ pub trait Prover {
     #[doc(hidden)]
     fn generate_proof<E>(
         &self,
+        k: usize,
         n: usize,
-        mut traces: Vec<Vec<Self::Trace>>,
+        mut traces: Vec<Vec<&Self::Trace>>,
     ) -> Result<StarkProof, ProverError>
     where
         E: FieldElement<BaseField = Self::BaseField>,
@@ -204,7 +208,7 @@ pub trait Prover {
         // serialize public inputs; these will be included in the seed for the public coin
         let pub_inputs_vec: Vec<_> = traces
             .iter()
-            .map(|trace| self.get_pub_inputs(trace))
+            .map(|&trace| self.get_pub_inputs(trace))
             .collect();
         let pub_inputs_elements_vec = pub_inputs_vec
             .iter()
@@ -214,15 +218,20 @@ pub trait Prover {
         // create an instance of AIR for the provided parameters. this takes a generic description
         // of the computation (provided via AIR type), and creates a description of a specific
         // execution of the computation for the provided public inputs.
-        //let airs = traces
-        //    .iter()
-        //    .zip(pub_inputs_vec)
-        //    .map(|(trace, pub_inputs)| {
-        //        Self::Air::new(trace.get_info(), pub_inputs, self.options().clone())
-        //    })
-        //    .collect();
-        let airs = Vec::new();
-        for (trace, pub_inputs) in traces.iter().zip(pub_inputs_vec) {}
+
+        let airs = traces
+            .iter()
+            .zip(pub_inputs_vec)
+            .map(|(trace, pub_inputs)| {
+                Self::Air::new(trace[0].get_info(), pub_inputs, self.options().clone())
+            })
+            .collect();
+        //TODO: Maybe this should be this way
+        // let airs = Vec::new();
+        // for (trace, pub_inputs) in traces.iter().zip(pub_inputs_vec) {
+        //     let sub_airs = trace.iter()
+
+        // }
 
         // create a channel which is used to simulate interaction between the prover and the
         // verifier; the channel will be used to commit to values and to draw randomness that
@@ -265,7 +274,16 @@ pub trait Prover {
         );
 
         // extend the main execution trace and build a Merkle tree from the extended trace
-        let traces_main_segment: Vec<_> = traces.iter().map(|trace| trace.main_segment()).collect();
+        // let traces_main_segment: Vec<_> =
+        //     traces.iter().map(|trace| trace[0].main_segment()).collect();
+        let mut traces_main_segment = Vec::with_capacity(n);
+        for trace in traces.iter() {
+            let sub_traces_main_segment: Vec<_> = trace
+                .iter()
+                .map(|sub_trace| sub_trace.main_segment())
+                .collect();
+            traces_main_segment.push(sub_traces_main_segment);
+        }
         let (main_traces_lde, main_trace_tree, main_traces_polys) =
             self.build_trace_commitment::<Self::BaseField>(traces_main_segment, &domain);
 
@@ -616,7 +634,7 @@ pub trait Prover {
     /// building a Merkle tree from the resulting hashes.
     fn build_trace_commitment<E>(
         &self,
-        traces: Vec<&ColMatrix<E>>,
+        traces: Vec<Vec<&ColMatrix<E>>>,
         domain: &StarkDomain<Self::BaseField>,
     ) -> (
         Vec<RowMatrix<E>>,
@@ -629,10 +647,12 @@ pub trait Prover {
         // extend the execution trace
         #[cfg(feature = "std")]
         let now = Instant::now();
-        let traces_polys_owned: Vec<_> = traces
-            .iter()
-            .map(|trace| trace.interpolate_columns())
-            .collect();
+        let mut traces_polys_owned: Vec<ColMatrix<E>> = Vec::new();
+        for &trace in traces.iter() {
+            for sub_trace in trace.iter() {
+                traces_polys_owned.push(sub_trace.interpolate_columns());
+            }
+        }
         let traces_polys: Vec<_> = traces_polys_owned
             .iter()
             .map(|trace_polys| trace_polys)
