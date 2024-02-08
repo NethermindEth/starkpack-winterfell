@@ -100,6 +100,7 @@ pub trait Trace: Sized {
     /// NOTE: this is a very expensive operation and is intended for use only in debug mode.
     fn validate<A, E>(
         &self,
+        sub_traces: &Vec<&Self>,
         air: &A,
         aux_segments: &[ColMatrix<E>],
         aux_rand_elements: &AuxTraceRandElements<E>,
@@ -119,65 +120,76 @@ pub trait Trace: Sized {
         // --- 1. make sure the assertions are valid ----------------------------------------------
 
         // first, check assertions against the main segment of the execution trace
-        for assertion in air.get_assertions() {
-            assertion.apply(self.length(), |step, value| {
-                assert!(
-                    value == self.main_segment().get(assertion.column(), step),
-                    "trace does not satisfy assertion main_trace({}, {}) == {}",
-                    assertion.column(),
-                    step,
-                    value
-                );
-            });
-        }
-
-        // then, check assertions against auxiliary trace segments
-        for assertion in air.get_aux_assertions(aux_rand_elements) {
-            // find which segment the assertion is for and remap assertion column index to the
-            // column index in the context of this segment
-            let mut column_idx = assertion.column();
-            let mut segment_idx = 0;
-            for i in 0..self.layout().num_aux_segments() {
-                let segment_width = self.layout().get_aux_segment_width(i);
-                if column_idx < segment_width {
-                    segment_idx = i;
-                    break;
-                }
-                column_idx -= segment_width;
+        let k = sub_traces.len();
+        for idx in 0..k {
+            for assertion in air.get_assertions(k, idx) {
+                assertion.apply(self.length(), |step, value| {
+                    assert!(
+                        //value == self.main_segment().get(assertion.column(), step),
+                        value == sub_traces[idx].main_segment().get(assertion.column(), step),
+                        "trace does not satisfy assertion main_trace({}, {}) == {}",
+                        assertion.column(),
+                        step,
+                        value
+                    );
+                });
             }
+            //TODO make sure this aux part is correct
+            // then, check assertions against auxiliary trace segments
+            for assertion in air.get_aux_assertions(aux_rand_elements) {
+                // find which segment the assertion is for and remap assertion column index to the
+                // column index in the context of this segment
+                let mut column_idx = assertion.column();
+                let mut segment_idx = 0;
+                for i in 0..self.layout().num_aux_segments() {
+                    let segment_width = self.layout().get_aux_segment_width(i);
+                    if column_idx < segment_width {
+                        segment_idx = i;
+                        break;
+                    }
+                    column_idx -= segment_width;
+                }
 
-            // get the matrix and verify the assertion against it
-            assertion.apply(self.length(), |step, value| {
-                assert!(
-                    value == aux_segments[segment_idx].get(column_idx, step),
-                    "trace does not satisfy assertion aux_trace({}, {}) == {}",
-                    assertion.column(),
-                    step,
-                    value
-                );
-            });
+                // get the matrix and verify the assertion against it
+                assertion.apply(self.length(), |step, value| {
+                    assert!(
+                        value == aux_segments[segment_idx].get(column_idx, step),
+                        "trace does not satisfy assertion aux_trace({}, {}) == {}",
+                        assertion.column(),
+                        step,
+                        value
+                    );
+                });
+            }
         }
-
         // --- 2. make sure this trace satisfies all transition constraints -----------------------
 
         // collect the info needed to build periodic values for a specific step
+
+        //maybe we should have a vector of periodic values
         let g = air.trace_domain_generator();
         let periodic_values_polys = air.get_periodic_column_polys();
         let mut periodic_values = vec![Self::BaseField::ZERO; periodic_values_polys.len()];
 
         // initialize buffers to hold evaluation frames and results of constraint evaluations
         let mut x = Self::BaseField::ONE;
-        let mut main_frame = EvaluationFrame::new(self.main_trace_width());
-        let mut aux_frame = if air.trace_info().is_multi_segment() {
-            Some(EvaluationFrame::<E>::new(self.aux_trace_width()))
-        } else {
-            None
-        };
+        let mut main_frame_vec = Vec::with_capacity(k);
+        let mut aux_frame_vec = Vec::with_capacity(k);
+        for idx in 0..k {
+            let mut main_frame = EvaluationFrame::new(self.main_trace_width());
+            let mut aux_frame = if air.trace_info().is_multi_segment() {
+                Some(EvaluationFrame::<E>::new(self.aux_trace_width()))
+            } else {
+                None
+            };
+            main_frame_vec.push(&main_frame);
+            aux_frame_vec.push(&aux_frame);
+        }
         let mut main_evaluations =
-            vec![Self::BaseField::ZERO; air.context().num_main_transition_constraints()];
-        let mut aux_evaluations = vec![E::ZERO; air.context().num_aux_transition_constraints()];
+            vec![Self::BaseField::ZERO; air.context().num_main_transition_constraints() * k];
+        let mut aux_evaluations = vec![E::ZERO; air.context().num_aux_transition_constraints() * k];
 
-        // we check transition constraints on all steps except the last k steps, where k is the
+        // we check transition constraints on all steps except the last t steps, where t is the
         // number of steps exempt from transition constraints (guaranteed to be at least 1)
         for step in 0..self.length() - air.context().num_transition_exemptions() {
             // build periodic values
@@ -189,8 +201,11 @@ pub trait Trace: Sized {
 
             // evaluate transition constraints for the main trace segment and make sure they all
             // evaluate to zeros
-            self.read_main_frame(step, &mut main_frame);
-            air.evaluate_transition(&main_frame, &periodic_values, &mut main_evaluations);
+            for idx in 0..k {
+                sub_traces[idx].read_main_frame(step, &mut main_frame_vec[idx]);
+            }
+            //Maybe the main_evaluations should be a vector of vectors
+            air.evaluate_transition(main_frame_vec, &periodic_values, &mut main_evaluations);
             for (i, &evaluation) in main_evaluations.iter().enumerate() {
                 assert!(
                     evaluation == Self::BaseField::ZERO,
@@ -200,11 +215,14 @@ pub trait Trace: Sized {
 
             // evaluate transition constraints for auxiliary trace segments (if any) and make
             // sure they all evaluate to zeros
-            if let Some(ref mut aux_frame) = aux_frame {
-                read_aux_frame(aux_segments, step, aux_frame);
+            if let Some(ref mut aux_frame) = aux_frame_vec[0] {
+                for idx in 0..k {
+                    //TODO check this part
+                    read_aux_frame(aux_segments, step, aux_frame);
+                }
                 air.evaluate_aux_transition(
-                    &main_frame,
-                    aux_frame,
+                    main_frame_vec,
+                    aux_frame_vec,
                     &periodic_values,
                     aux_rand_elements,
                     &mut aux_evaluations,

@@ -216,7 +216,7 @@ pub trait Air: Send + Sync {
     );
 
     /// Returns a set of assertions against a concrete execution trace of this computation.
-    fn get_assertions(&self) -> Vec<Assertion<Self::BaseField>>;
+    fn get_assertions(&self, k: usize, idx: usize) -> Vec<Assertion<Self::BaseField>>;
 
     // AUXILIARY TRACE CONSTRAINTS
     // --------------------------------------------------------------------------------------------
@@ -361,7 +361,7 @@ pub trait Air: Send + Sync {
     ) -> BoundaryConstraints<E> {
         BoundaryConstraints::new(
             self.context(),
-            self.get_assertions(),
+            self.get_assertions(k, i),
             self.get_aux_assertions(aux_rand_elements),
             composition_coefficients,
         )

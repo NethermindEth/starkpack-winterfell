@@ -319,7 +319,7 @@ pub trait Prover {
         let mut aux_traces_rand_elements = Vec::with_capacity(n);
         let mut rand_elements_vec = Vec::with_capacity(n);
         let mut aux_segments = Vec::with_capacity(n);
-        for i in 0..traces[0].layout().num_aux_segments() {
+        for i in 0..traces[0][0].layout().num_aux_segments() {
             let aux_traces_and_rand_elements: Vec<_> = traces
                 .iter_mut()
                 .map(|trace| {
@@ -329,16 +329,21 @@ pub trait Prover {
                     let rand_elements = channel.get_aux_trace_segment_rand_elements(i).to_owned();
                     rand_elements_vec.push(rand_elements.clone());
 
-                    let aux_trace_segments = Vec::new();
-                    let aux_segment = trace
-                        .build_aux_segment(&aux_trace_segments, &rand_elements)
-                        .expect("Failed to build auxiliary trace segment");
-
+                    let mut aux_trace_segments = Vec::new();
+                    let mut aux_segment = Vec::with_capacity(k);
+                    for &sub_trace in trace.iter() {
+                        let aux_sub_trace_segments = Vec::new();
+                        let aux_sub_segment = sub_trace
+                            .build_aux_segment(&aux_sub_trace_segments, &rand_elements)
+                            .expect("Failed to build auxiliary trace segment");
+                        aux_trace_segments.push(aux_sub_trace_segments);
+                        aux_segment.push(aux_sub_segment);
+                    }
                     #[cfg(feature = "std")]
                     debug!(
                         "Built auxiliary trace segment of {} columns and 2^{} steps in {} ms",
-                        aux_segment.num_cols(),
-                        aux_segment.num_rows().ilog2(),
+                        aux_segment[0].num_cols(),
+                        aux_segment[0].num_rows().ilog2(),
                         now.elapsed().as_millis()
                     );
                     let aux_trace_rand_elements = AuxTraceRandElements::new();
@@ -349,9 +354,17 @@ pub trait Prover {
                 .collect();
 
             // extend the auxiliary trace segment and build a Merkle tree from the extended trace
-            let aux_segments: Vec<_> = aux_segments.iter().map(|aux_segment| aux_segment).collect();
+            let mut temp_segments = Vec::new();
+            for &aux_segment in aux_segments.iter() {
+                let aux_sub_segments: Vec<_> = aux_segment
+                    .iter()
+                    .map(|aux_sub_segment| aux_sub_segment)
+                    .collect();
+                temp_segments.push(aux_sub_segments);
+            }
+            //let aux_segments = temp_segments;
             let (aux_segments_lde, aux_segment_tree, aux_segments_polys) =
-                self.build_trace_commitment::<E>(aux_segments.clone(), &domain);
+                self.build_trace_commitment::<E>(temp_segments, &domain);
 
             // commit to the LDE of the extended auxiliary trace segment  by writing the root of
             // its Merkle tree into the channel
@@ -383,11 +396,16 @@ pub trait Prover {
                 // of the same size
                 .nth(i)
             {
-                trace.validate(&airs[i], aux_trace_segments, aux_trace_rand_elements);
+                trace[0].validate(
+                    trace,
+                    &airs[i],
+                    &aux_trace_segments[i],
+                    aux_trace_rand_elements,
+                );
             } else {
                 let empty_col_matrix = Vec::new();
                 let empty_rand_elements = AuxTraceRandElements::<E>::new();
-                trace.validate(&airs[i], &empty_col_matrix, &empty_rand_elements);
+                trace[0].validate(trace, &airs[i], &empty_col_matrix, &empty_rand_elements);
             }
         }
 
@@ -400,8 +418,6 @@ pub trait Prover {
         // identical denominators.
         #[cfg(feature = "std")]
         let now = Instant::now();
-        //let mut constraint_coeffs_vec = Vec::new();
-        //let mut evaluator_vec = Vec::new();
         let mut constraint_evaluations_vec = Vec::new();
         for (i, air) in airs.iter().enumerate() {
             let constraint_coeffs = channel.get_constraint_composition_coeffs();

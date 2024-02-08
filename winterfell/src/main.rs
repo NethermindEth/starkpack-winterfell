@@ -71,21 +71,21 @@ fn main() {
             &self,
             frames: Vec<&EvaluationFrame<E>>,
             _periodic_values: &[E],
-            results: Vec<&mut [E]>,
+            result: &mut [E],
         ) {
             //let k = frames.lem();
             for (i, &frame) in frames.iter().enumerate() {
                 let current_state = &frame.current()[0];
                 let next_state = current_state.exp(3u32.into()) + E::from(42u32);
-                results[i][0] = frame.next()[0] - next_state;
+                result[i][0] = frame.next()[0] - next_state;
             }
         }
-        fn get_assertions(&self, i: usize, k: usize) -> Vec<Assertion<Self::BaseField>> {
+        fn get_assertions(&self, k: usize, idx: usize) -> Vec<Assertion<Self::BaseField>> {
             let last_step = self.trace_length() - 1;
-            if i == 0 {
+            if idx == 0 {
                 vec![Assertion::single(0, 0, self.start)]
             }
-            if i == k {
+            if idx == k - 1 {
                 vec![Assertion::single(0, last_step, self.result)]
             }
             vec![]
