@@ -164,22 +164,22 @@ pub trait Prover {
     /// secret and public inputs. Public inputs must match the value returned from
     /// [Self::get_pub_inputs()](Prover::get_pub_inputs) for the provided trace.
     #[rustfmt::skip]
-    fn prove(&self, n:usize, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
+    fn prove(&self, k:usize, n:usize, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
         // figure out which version of the generic proof generation procedure to run. this is a sort
         // of static dispatch for selecting two generic parameter: extension field and hash function.
         match self.options().field_extension() {
-            FieldExtension::None => self.generate_proof::<Self::BaseField>(n, traces),
+            FieldExtension::None => self.generate_proof::<Self::BaseField>(k, n, traces),
             FieldExtension::Quadratic => {
                 if !<QuadExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(2));
                 }
-                self.generate_proof::<QuadExtension<Self::BaseField>>(n, traces)
+                self.generate_proof::<QuadExtension<Self::BaseField>>(k, n, traces)
             }
             FieldExtension::Cubic => {
                 if !<CubeExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(3));
                 }
-                self.generate_proof::<CubeExtension<Self::BaseField>>(n, traces)
+                self.generate_proof::<CubeExtension<Self::BaseField>>(k, n, traces)
             }
         }
     }
@@ -193,6 +193,7 @@ pub trait Prover {
     #[doc(hidden)]
     fn generate_proof<E>(
         &self,
+        k: usize,
         n: usize,
         mut traces: Vec<Self::Trace>,
     ) -> Result<StarkProof, ProverError>
@@ -218,7 +219,7 @@ pub trait Prover {
             .iter()
             .zip(pub_inputs_vec)
             .map(|(trace, pub_inputs)| {
-                Self::Air::new(trace.get_info(), pub_inputs, self.options().clone())
+                Self::Air::new(trace.get_info(), pub_inputs, self.options().clone(), k)
             })
             .collect();
 

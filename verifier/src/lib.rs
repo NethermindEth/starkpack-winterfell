@@ -83,6 +83,7 @@ pub use errors::VerifierError;
 pub fn verify<AIR, HashFn, RandCoin>(
     proof: StarkProof,
     pub_inputs_vec: Vec<AIR::PublicInputs>,
+    k:usize,
 ) -> Result<(), VerifierError> 
 where 
     AIR: Air, 
@@ -98,7 +99,7 @@ where
     }
     
     // create AIR instance for the computation specified in the proof
-    let airs: Vec<_> = pub_inputs_vec.into_iter().enumerate().map(|(i, pub_inputs)| AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).to_owned())).collect();
+    let airs: Vec<_> = pub_inputs_vec.into_iter().enumerate().map(|(i, pub_inputs)| AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).to_owned(),k)).collect();
 
     // figure out which version of the generic proof verification procedure to run. this is a sort
     // of static dispatch for selecting two generic parameter: extension field and hash function.

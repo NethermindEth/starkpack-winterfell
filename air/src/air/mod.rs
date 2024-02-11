@@ -193,7 +193,12 @@ pub trait Air: Send + Sync {
     /// - `public_inputs` specifies public inputs for this instance of the computation.
     /// - `options` defines proof generation options such as blowup factor, hash function etc.
     ///   these options define security level of the proof and influence proof generation time.
-    fn new(trace_info: TraceInfo, pub_inputs: Self::PublicInputs, options: ProofOptions) -> Self;
+    fn new(
+        trace_info: TraceInfo,
+        pub_inputs: Self::PublicInputs,
+        options: ProofOptions,
+        k: usize,
+    ) -> Self;
 
     /// Returns context for this instance of the computation.
     fn context(&self) -> &AirContext<Self::BaseField>;

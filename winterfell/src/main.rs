@@ -13,15 +13,21 @@ use std::time::Instant;
 pub use verifier::{verify, VerifierError};
 
 fn main() {
-    pub fn build_do_work_trace(start: BaseElement, n: usize) -> TraceTable<BaseElement> {
-        let trace_width: usize = 1;
-        let mut trace = TraceTable::new(trace_width, n);
+    pub fn build_do_work_trace(start: BaseElement, n: usize, k: usize) -> TraceTable<BaseElement> {
+        let trace_width: usize = 1 * k;
+        let mut trace = TraceTable::new(trace_width, n / k);
         trace.fill(
             |state| {
                 state[0] = start;
+                for idx in 1..k {
+                    state[idx] = state[idx - 1].exp(3u32.into()) + BaseElement::new(42);
+                }
             },
             |_, state| {
-                state[0] = state[0].exp(3u32.into()) + BaseElement::new(42);
+                state[0] = state[k - 1].exp(3u32.into()) + BaseElement::new(42);
+                for idx in 1..k {
+                    state[idx] = state[idx - 1].exp(3u32.into()) + BaseElement::new(42);
+                }
             },
         );
         trace
@@ -46,9 +52,14 @@ fn main() {
     impl Air for WorkAir {
         type BaseField = BaseElement;
         type PublicInputs = PublicInputs;
-        fn new(trace_info: TraceInfo, pub_inputs: PublicInputs, options: ProofOptions) -> Self {
-            assert_eq!(1, trace_info.width());
-            let degrees = vec![TransitionConstraintDegree::new(3)];
+        fn new(
+            trace_info: TraceInfo,
+            pub_inputs: PublicInputs,
+            options: ProofOptions,
+            k: usize,
+        ) -> Self {
+            assert_eq!(1 * k, trace_info.width());
+            let degrees = vec![TransitionConstraintDegree::new(3); k];
             WorkAir {
                 context: AirContext::new(trace_info, degrees, 2, options),
                 start: pub_inputs.start,
@@ -61,15 +72,22 @@ fn main() {
             _periodic_values: &[E],
             result: &mut [E],
         ) {
-            let current_state = &frame.current()[0];
-            let next_state = current_state.exp(3u32.into()) + E::from(42u32);
-            result[0] = frame.next()[0] - next_state;
+            let current = &frame.current();
+            let next = &frame.next();
+            //let k = current.len();
+            let k = 2_usize.pow(7);
+            for idx in 0..k - 1 {
+                result[idx] = current[idx].exp(3u32.into()) + E::from(42u32) - current[idx + 1];
+            }
+            result[k - 1] = current[k - 1].exp(3u32.into()) + E::from(42u32) - next[0];
         }
         fn get_assertions(&self) -> Vec<Assertion<Self::BaseField>> {
             let last_step = self.trace_length() - 1;
+            let k = 2_usize.pow(7);
             vec![
                 Assertion::single(0, 0, self.start),
-                Assertion::single(0, last_step, self.result),
+                //TODO
+                Assertion::single(k - 1, last_step, self.result),
             ]
         }
         fn context(&self) -> &AirContext<Self::BaseField> {
@@ -92,9 +110,10 @@ fn main() {
         type RandomCoin = DefaultRandomCoin<Self::HashFn>;
         fn get_pub_inputs(&self, trace: &Self::Trace) -> PublicInputs {
             let last_step = trace.length() - 1;
+            let k = 2_usize.pow(7);
             PublicInputs {
                 start: trace.get(0, 0),
-                result: trace.get(0, last_step),
+                result: trace.get(k - 1, last_step),
             }
         }
         fn options(&self) -> &ProofOptions {
@@ -102,18 +121,22 @@ fn main() {
         }
     }
 
-    let starting_vec: Vec<_> = (0..2_u128.pow(5)).map(|i| BaseElement::new(i)).collect();
-    let m = 1024;
+    let starting_vec: Vec<_> = (0..1_u128.pow(5)).map(|i| BaseElement::new(i)).collect();
+    let m = 2_usize.pow(16);
     let n = starting_vec.len();
+    let k = 2_usize.pow(7);
     // Build the execution trace and get the result from the last step.
     let now: Instant = Instant::now();
     let traces: Vec<_> = starting_vec
         .iter()
-        .map(|&start| build_do_work_trace(start, m))
+        .map(|&start| build_do_work_trace(start, m, k))
         .collect();
     println!("Built execution Traces in {}ms", now.elapsed().as_millis());
 
-    let results: Vec<_> = traces.iter().map(|trace| trace.get(0, m - 1)).collect();
+    let results: Vec<_> = traces
+        .iter()
+        .map(|trace| trace.get(k - 1, m / k - 1))
+        .collect();
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(
         32, // number of queries
@@ -126,7 +149,7 @@ fn main() {
     // Instantiate the prover and generate the proof.
     let prover = WorkProver::new(options);
     let now: Instant = Instant::now();
-    let proof = prover.prove(n, traces).unwrap();
+    let proof = prover.prove(k, n, traces).unwrap();
     println!("Generated the proof in {}ms", now.elapsed().as_millis());
 
     let proof_bytes: Vec<u8> = proof.to_bytes();
@@ -146,6 +169,7 @@ fn main() {
     match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
         proof,
         pub_inputs_vec,
+        k,
     ) {
         Ok(_) => {
             println!(
