@@ -144,7 +144,11 @@ pub trait Prover {
     /// trace.
     ///
     /// Public inputs need to be shared with the verifier in order for them to verify a proof.
-    fn get_pub_inputs(&self, trace: &Self::Trace) -> <<Self as Prover>::Air as Air>::PublicInputs;
+    fn get_pub_inputs(
+        &self,
+        trace: &Self::Trace,
+        k: usize,
+    ) -> <<Self as Prover>::Air as Air>::PublicInputs;
 
     /// Returns [ProofOptions] which this prover uses to generate STARK proofs.
     ///
@@ -205,7 +209,7 @@ pub trait Prover {
         // serialize public inputs; these will be included in the seed for the public coin
         let pub_inputs_vec: Vec<_> = traces
             .iter()
-            .map(|trace| self.get_pub_inputs(trace))
+            .map(|trace| self.get_pub_inputs(trace, k))
             .collect();
         let pub_inputs_elements_vec = pub_inputs_vec
             .iter()
@@ -389,6 +393,7 @@ pub trait Prover {
             //constraint_coeffs_vec.push(constraint_coeffs.clone());
             if let Some(aux_trace_rand_elements) = aux_traces_rand_elements.iter().nth(i) {
                 let evaluator = ConstraintEvaluator::new(
+                    k,
                     air,
                     aux_trace_rand_elements.to_owned(),
                     constraint_coeffs,
@@ -401,7 +406,7 @@ pub trait Prover {
             } else {
                 let empty_rand_elements = AuxTraceRandElements::<E>::new();
                 let evaluator =
-                    ConstraintEvaluator::new(air, empty_rand_elements, constraint_coeffs);
+                    ConstraintEvaluator::new(k, air, empty_rand_elements, constraint_coeffs);
 
                 //evaluator_vec.push(evaluator);
                 let constraint_evaluations =

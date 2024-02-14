@@ -119,7 +119,7 @@ pub trait Trace: Sized {
         // --- 1. make sure the assertions are valid ----------------------------------------------
 
         // first, check assertions against the main segment of the execution trace
-        for assertion in air.get_assertions() {
+        for assertion in air.get_assertions(self.main_trace_width()) {
             assertion.apply(self.length(), |step, value| {
                 assert!(
                     value == self.main_segment().get(assertion.column(), step),
@@ -190,7 +190,12 @@ pub trait Trace: Sized {
             // evaluate transition constraints for the main trace segment and make sure they all
             // evaluate to zeros
             self.read_main_frame(step, &mut main_frame);
-            air.evaluate_transition(&main_frame, &periodic_values, &mut main_evaluations);
+            air.evaluate_transition(
+                self.main_trace_width(),
+                &main_frame,
+                &periodic_values,
+                &mut main_evaluations,
+            );
             for (i, &evaluation) in main_evaluations.iter().enumerate() {
                 assert!(
                     evaluation == Self::BaseField::ZERO,

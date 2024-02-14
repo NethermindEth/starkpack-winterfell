@@ -32,12 +32,13 @@ impl<E: FieldElement> BoundaryConstraints<E> {
     /// Returns a new instance of [BoundaryConstraints] constructed from the constraints defined
     /// by an instance of AIR for a specific computation.
     pub fn new<A: Air<BaseField = E::BaseField>>(
+        k: usize,
         air: &A,
         aux_rand_elements: &AuxTraceRandElements<E>,
         composition_coefficients: &[E],
     ) -> Self {
         // get constraints from the AIR instance
-        let source = air.get_boundary_constraints(aux_rand_elements, composition_coefficients);
+        let source = air.get_boundary_constraints(k, aux_rand_elements, composition_coefficients);
 
         // initialize a map of twiddles here so that we can keep track of already computed
         // twiddles; this helps us avoid building twiddles over and over again for constraints

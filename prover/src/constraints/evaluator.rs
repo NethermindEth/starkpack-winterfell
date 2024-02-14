@@ -40,6 +40,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
     /// Returns a new evaluator which can be used to evaluate transition and boundary constraints
     /// over extended execution trace.
     pub fn new(
+        k: usize,
         air: &'a A,
         aux_rand_elements: AuxTraceRandElements<E>,
         composition_coefficients: ConstraintCompositionCoefficients<E>,
@@ -54,8 +55,12 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
 
         // build boundary constraint groups; these will be used to evaluate and compose boundary
         // constraint evaluations.
-        let boundary_constraints =
-            BoundaryConstraints::new(air, &aux_rand_elements, &composition_coefficients.boundary);
+        let boundary_constraints = BoundaryConstraints::new(
+            k,
+            air,
+            &aux_rand_elements,
+            &composition_coefficients.boundary,
+        );
 
         ConstraintEvaluator {
             air,
@@ -163,7 +168,12 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
 
             // evaluate transition constraints and save the merged result the first slot of the
             // evaluations buffer
-            evaluations[0] = self.evaluate_main_transition(&main_frame, step, &mut t_evaluations);
+            evaluations[0] = self.evaluate_main_transition(
+                trace.main_trace_width(),
+                &main_frame,
+                step,
+                &mut t_evaluations,
+            );
 
             // when in debug mode, save transition constraint evaluations
             #[cfg(debug_assertions)]
@@ -215,7 +225,12 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
             // evaluate transition constraints and save the merged result the first slot of the
             // evaluations buffer; we evaluate and compose constraints in the same function, we
             // can just add up the results of evaluating main and auxiliary constraints.
-            evaluations[0] = self.evaluate_main_transition(&main_frame, step, &mut tm_evaluations);
+            evaluations[0] = self.evaluate_main_transition(
+                trace.main_trace_width(),
+                &main_frame,
+                step,
+                &mut tm_evaluations,
+            );
             evaluations[0] +=
                 self.evaluate_aux_transition(&main_frame, &aux_frame, step, &mut ta_evaluations);
 
@@ -251,6 +266,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
     #[rustfmt::skip]
     fn evaluate_main_transition(
         &self,
+        k:usize,
         main_frame: &EvaluationFrame<E::BaseField>,
         step: usize,
         evaluations: &mut [E::BaseField],
@@ -263,7 +279,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
 
         // evaluate transition constraints over the main segment of the execution trace and save
         // the results into evaluations buffer
-        self.air.evaluate_transition(main_frame, periodic_values, evaluations);
+        self.air.evaluate_transition(k, main_frame, periodic_values, evaluations);
 
         // merge transition constraint evaluations into a single value and return it;
         // we can do this here because all transition constraints have the same divisor.

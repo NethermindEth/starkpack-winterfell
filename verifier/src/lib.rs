@@ -108,7 +108,7 @@ where
             let public_coin = RandCoin::new(&public_coin_seed);
             match VerifierChannel::new(&airs, proof) {
                 Ok(channel) => {
-                    perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(&airs, channel, public_coin)
+                    perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(k,&airs, channel, public_coin)
                 },
                 Err(err) => {
                     println!("Err: {}", err);
@@ -122,7 +122,7 @@ where
             }
             let public_coin = RandCoin::new(&public_coin_seed);
             let channel = VerifierChannel::new(&airs, proof)?;
-            perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(&airs, channel, public_coin)
+            perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(k,&airs, channel, public_coin)
         },
         FieldExtension::Cubic => {
             if !<CubeExtension<AIR::BaseField>>::is_supported() {
@@ -131,7 +131,7 @@ where
             let public_coin = RandCoin::new(&public_coin_seed);
             let channel = VerifierChannel::new(&
                 airs, proof)?;
-            perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(&airs, channel, public_coin)
+            perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(k,&airs, channel, public_coin)
         },
     }
 }
@@ -141,6 +141,7 @@ where
 /// Performs the actual verification by reading the data from the `channel` and making sure it
 /// attests to a correct execution of the computation specified by the provided `air`.
 fn perform_verification<A, E, H, R>(
+    k: usize,
     airs: &Vec<A>,
     mut channel: VerifierChannel<E, H>,
     mut public_coin: R,
@@ -222,6 +223,7 @@ where
         let constraints_coeffs_i = &constraints_coeffs[i];
         let aux_trace_rand_elements_i = &aux_traces_rand_elements[i];
         let ood_constraint_evaluation_1 = evaluate_constraints(
+            k,
             &airs[i],
             constraints_coeffs_i.to_owned(),
             &ood_main_traces_frame[i],

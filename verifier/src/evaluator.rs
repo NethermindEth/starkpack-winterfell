@@ -12,6 +12,7 @@ use utils::collections::Vec;
 
 /// Evaluates constraints for the specified evaluation frame.
 pub fn evaluate_constraints<A: Air, E: FieldElement<BaseField = A::BaseField>>(
+    k: usize,
     air: &A,
     composition_coefficients: ConstraintCompositionCoefficients<E>,
     main_trace_frame: &EvaluationFrame<E>,
@@ -37,7 +38,7 @@ pub fn evaluate_constraints<A: Air, E: FieldElement<BaseField = A::BaseField>>(
 
     // evaluate transition constraints for the main trace segment
     let mut t_evaluations1 = E::zeroed_vector(t_constraints.num_main_constraints());
-    air.evaluate_transition(main_trace_frame, &periodic_values, &mut t_evaluations1);
+    air.evaluate_transition(k, main_trace_frame, &periodic_values, &mut t_evaluations1);
 
     // evaluate transition constraints for auxiliary trace segments (if any)
     let mut t_evaluations2 = E::zeroed_vector(t_constraints.num_aux_constraints());
@@ -60,7 +61,7 @@ pub fn evaluate_constraints<A: Air, E: FieldElement<BaseField = A::BaseField>>(
 
     // get boundary constraints grouped by common divisor from the AIR
     let b_constraints =
-        air.get_boundary_constraints(&aux_rand_elements, &composition_coefficients.boundary);
+        air.get_boundary_constraints(k, &aux_rand_elements, &composition_coefficients.boundary);
 
     // iterate over boundary constraint groups for the main trace segment (each group has a
     // distinct divisor), evaluate constraints in each group and add their combination to the

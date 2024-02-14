@@ -16,6 +16,7 @@ fn main() {
     pub fn build_do_work_trace(start: BaseElement, n: usize, k: usize) -> TraceTable<BaseElement> {
         let trace_width: usize = 1 * k;
         let mut trace = TraceTable::new(trace_width, n / k);
+        //mod k
         trace.fill(
             |state| {
                 state[0] = start;
@@ -30,6 +31,21 @@ fn main() {
                 }
             },
         );
+        //sequential
+        // trace.fill(
+        //     |state| {
+        //         state[0] = start;
+        //         for idx in 1..k {
+        //             state[idx] = state[idx - 1].exp(3u32.into()) + BaseElement::new(42);
+        //         }
+        //     },
+        //     |_, state| {
+        //         state[0] = state[k - 1].exp(3u32.into()) + BaseElement::new(42);
+        //         for idx in 1..k {
+        //             state[idx] = state[idx - 1].exp(3u32.into()) + BaseElement::new(42);
+        //         }
+        //     },
+        // );
         trace
     }
     // Public inputs for our computation will consist of the starting value and the end result.
@@ -68,22 +84,20 @@ fn main() {
         }
         fn evaluate_transition<E: FieldElement + From<Self::BaseField>>(
             &self,
+            k: usize,
             frame: &EvaluationFrame<E>,
             _periodic_values: &[E],
             result: &mut [E],
         ) {
             let current = &frame.current();
             let next = &frame.next();
-            //let k = current.len();
-            let k = 2_usize.pow(7);
             for idx in 0..k - 1 {
                 result[idx] = current[idx].exp(3u32.into()) + E::from(42u32) - current[idx + 1];
             }
             result[k - 1] = current[k - 1].exp(3u32.into()) + E::from(42u32) - next[0];
         }
-        fn get_assertions(&self) -> Vec<Assertion<Self::BaseField>> {
+        fn get_assertions(&self, k: usize) -> Vec<Assertion<Self::BaseField>> {
             let last_step = self.trace_length() - 1;
-            let k = 2_usize.pow(7);
             vec![
                 Assertion::single(0, 0, self.start),
                 //TODO
@@ -108,9 +122,8 @@ fn main() {
         type Trace = TraceTable<Self::BaseField>;
         type HashFn = Blake3_256<Self::BaseField>;
         type RandomCoin = DefaultRandomCoin<Self::HashFn>;
-        fn get_pub_inputs(&self, trace: &Self::Trace) -> PublicInputs {
+        fn get_pub_inputs(&self, trace: &Self::Trace, k: usize) -> PublicInputs {
             let last_step = trace.length() - 1;
-            let k = 2_usize.pow(7);
             PublicInputs {
                 start: trace.get(0, 0),
                 result: trace.get(k - 1, last_step),
@@ -124,7 +137,7 @@ fn main() {
     let starting_vec: Vec<_> = (0..1_u128.pow(5)).map(|i| BaseElement::new(i)).collect();
     let m = 2_usize.pow(16);
     let n = starting_vec.len();
-    let k = 2_usize.pow(7);
+    let k = 2_usize.pow(5);
     // Build the execution trace and get the result from the last step.
     let now: Instant = Instant::now();
     let traces: Vec<_> = starting_vec

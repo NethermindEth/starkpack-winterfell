@@ -215,13 +215,14 @@ pub trait Air: Send + Sync {
     /// (when extension fields are used).
     fn evaluate_transition<E: FieldElement<BaseField = Self::BaseField>>(
         &self,
+        k: usize,
         frame: &EvaluationFrame<E>,
         periodic_values: &[E],
         result: &mut [E],
     );
 
     /// Returns a set of assertions against a concrete execution trace of this computation.
-    fn get_assertions(&self) -> Vec<Assertion<Self::BaseField>>;
+    fn get_assertions(&self, k: usize) -> Vec<Assertion<Self::BaseField>>;
 
     // AUXILIARY TRACE CONSTRAINTS
     // --------------------------------------------------------------------------------------------
@@ -361,12 +362,13 @@ pub trait Air: Send + Sync {
     /// combination of boundary constraints during constraint merging.
     fn get_boundary_constraints<E: FieldElement<BaseField = Self::BaseField>>(
         &self,
+        k: usize,
         aux_rand_elements: &AuxTraceRandElements<E>,
         composition_coefficients: &[E],
     ) -> BoundaryConstraints<E> {
         BoundaryConstraints::new(
             self.context(),
-            self.get_assertions(),
+            self.get_assertions(k),
             self.get_aux_assertions(aux_rand_elements),
             composition_coefficients,
         )
