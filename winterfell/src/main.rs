@@ -12,22 +12,25 @@ pub use prover::{
 use std::time::Instant;
 pub use verifier::{verify, VerifierError};
 
+const NUM_COLS: usize = 10;
 fn main() {
     pub fn build_do_work_trace(start: BaseElement, n: usize, k: usize) -> TraceTable<BaseElement> {
-        let trace_width: usize = 1 * k;
+        let trace_width: usize = NUM_COLS * k;
         let mut trace = TraceTable::new(trace_width, n / k);
         //mod k
         trace.fill(
             |state| {
                 state[0] = start;
                 for idx in 1..k {
-                    state[idx] = state[idx - 1].exp(3u32.into()) + BaseElement::new(42);
+                    state[NUM_COLS * idx] =
+                        state[NUM_COLS * (idx - 1)].exp(3u32.into()) + BaseElement::new(42);
                 }
             },
             |_, state| {
-                state[0] = state[k - 1].exp(3u32.into()) + BaseElement::new(42);
+                state[0] = state[NUM_COLS * (k - 1)].exp(3u32.into()) + BaseElement::new(42);
                 for idx in 1..k {
-                    state[idx] = state[idx - 1].exp(3u32.into()) + BaseElement::new(42);
+                    state[NUM_COLS * idx] =
+                        state[NUM_COLS * (idx - 1)].exp(3u32.into()) + BaseElement::new(42);
                 }
             },
         );
@@ -74,8 +77,9 @@ fn main() {
             options: ProofOptions,
             k: usize,
         ) -> Self {
-            assert_eq!(1 * k, trace_info.width());
+            assert_eq!(NUM_COLS * k, trace_info.width());
             let degrees = vec![TransitionConstraintDegree::new(3); k];
+            println!("degrees: {:?}", degrees);
             WorkAir {
                 context: AirContext::new(trace_info, degrees, 2, options),
                 start: pub_inputs.start,
@@ -91,17 +95,22 @@ fn main() {
         ) {
             let current = &frame.current();
             let next = &frame.next();
+            println!("current len {}, next len {}", current.len(), next.len());
+            println!("result len {}", result.len());
             for idx in 0..k - 1 {
-                result[idx] = current[idx].exp(3u32.into()) + E::from(42u32) - current[idx + 1];
+                println!("idx = {idx}");
+                println!("idx + 1 = {}", idx + 1);
+                result[idx] = current[NUM_COLS * idx].exp(3u32.into()) + E::from(42u32)
+                    - current[NUM_COLS * (idx + 1)];
             }
-            result[k - 1] = current[k - 1].exp(3u32.into()) + E::from(42u32) - next[0];
+            result[k - 1] = current[NUM_COLS * (k - 1)].exp(3u32.into()) + E::from(42u32) - next[0];
         }
         fn get_assertions(&self, k: usize) -> Vec<Assertion<Self::BaseField>> {
             let last_step = self.trace_length() - 1;
+            println!("RESULT: {}", self.result);
             vec![
                 Assertion::single(0, 0, self.start),
-                //TODO
-                Assertion::single(k - 1, last_step, self.result),
+                Assertion::single(NUM_COLS * (k - 1), last_step, self.result),
             ]
         }
         fn context(&self) -> &AirContext<Self::BaseField> {
@@ -126,7 +135,7 @@ fn main() {
             let last_step = trace.length() - 1;
             PublicInputs {
                 start: trace.get(0, 0),
-                result: trace.get(k - 1, last_step),
+                result: trace.get(NUM_COLS * (k - 1), last_step),
             }
         }
         fn options(&self) -> &ProofOptions {
@@ -135,9 +144,9 @@ fn main() {
     }
 
     let starting_vec: Vec<_> = (0..1_u128.pow(5)).map(|i| BaseElement::new(i)).collect();
-    let m = 2_usize.pow(16);
+    let m = 2_usize.pow(4);
     let n = starting_vec.len();
-    let k = 2_usize.pow(5);
+    let k = 2_usize.pow(1);
     // Build the execution trace and get the result from the last step.
     let now: Instant = Instant::now();
     let traces: Vec<_> = starting_vec
@@ -145,11 +154,16 @@ fn main() {
         .map(|&start| build_do_work_trace(start, m, k))
         .collect();
     println!("Built execution Traces in {}ms", now.elapsed().as_millis());
+    for (i, trace) in traces.iter().enumerate() {
+        println!("Trace {}", i);
+        println!("{}", trace);
+    }
 
     let results: Vec<_> = traces
         .iter()
-        .map(|trace| trace.get(k - 1, m / k - 1))
+        .map(|trace| trace.get(NUM_COLS * (k - 1), m / k - 1))
         .collect();
+    println!("Results\n{:?}", results);
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(
         32, // number of queries

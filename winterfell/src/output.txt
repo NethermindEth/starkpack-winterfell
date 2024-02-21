@@ -1,0 +1,130 @@
+Built execution Traces in 0ms
+Trace 0
+0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       42                                      0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       
+74130                                   0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       407363393997042                         0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       
+77396251945601310992046440124597180784  0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       134308444378839142461248109778758142049 0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       
+295803358040117308861075179661047890826 0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       258977990165700460958091393524086710564 0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       
+259316771406467465975904468001251613134 0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       273756224321492743903311231360143152972 0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       
+71964016732152731525747203937900023718  0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       34507019737875664245861043012634824074  0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       
+54953409500877181022694761981951235314  0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       140830590310256214162995111729307969436 0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       
+287330284369689641443258635153873178642 0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       63481572813679061006679893145212070872  0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       0                                       
+
+Results
+[BaseElement(63481572813679061006679893145212070872)]
+degrees: [TransitionConstraintDegree { base: 3, cycles: [] }, TransitionConstraintDegree { base: 3, cycles: [] }]
+Built domain of 2^6 elements in 0 ms
+Merkle trace and commit in 0ms
+LDE time in 0ms
+AUX time in 0ms
+RESULT: 63481572813679061006679893145212070872
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+Validate time in 0ms
+k in prove before constraintevalautor = 2
+RESULT: 63481572813679061006679893145212070872
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+Evaluated constraints over domain of 2^4 elements in 0 ms
+Converted constraint evaluations into 2 composition polynomial columns of degree 7 in 0 ms
+Built DEEP composition polynomial of degree 6 in 0 ms
+Evaluated DEEP composition polynomial over LDE domain (2^6 elements) in 0 ms
+Computed 0 FRI layers from composition polynomial evaluations in 0 ms
+Determined 32 query positions in 0 ms
+Built proof object in 0 ms
+Generated the proof in 1ms
+Proof size: 13.4 KB
+degrees: [TransitionConstraintDegree { base: 3, cycles: [] }, TransitionConstraintDegree { base: 3, cycles: [] }]
+current len 20, next len 20
+result len 2
+idx = 0
+idx + 1 = 1
+RESULT: 63481572813679061006679893145212070872
+Proof verified in 0.5 ms
