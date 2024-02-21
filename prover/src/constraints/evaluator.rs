@@ -78,6 +78,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
     /// evaluation domain can be many times smaller than the full LDE domain.
     pub fn evaluate(
         self,
+        k: usize,
         trace: &TraceLde<E>,
         domain: &'a StarkDomain<E::BaseField>,
     ) -> ConstraintEvaluationTable<'a, E> {
@@ -124,7 +125,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
             if self.air.trace_info().is_multi_segment() {
                 self.evaluate_fragment_full(trace, domain, fragment);
             } else {
-                self.evaluate_fragment_main(trace, domain, fragment);
+                self.evaluate_fragment_main(k, trace, domain, fragment);
             }
         });
 
@@ -144,6 +145,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
     /// This evaluates constraints only over the main segment of the execution trace.
     fn evaluate_fragment_main(
         &self,
+        k: usize,
         trace: &TraceLde<E>,
         domain: &StarkDomain<A::BaseField>,
         fragment: &mut EvaluationTableFragment<E>,
@@ -169,7 +171,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
             // evaluate transition constraints and save the merged result the first slot of the
             // evaluations buffer
             evaluations[0] = self.evaluate_main_transition(
-                trace.main_trace_width(),
+                k,
                 &main_frame,
                 step,
                 &mut t_evaluations,

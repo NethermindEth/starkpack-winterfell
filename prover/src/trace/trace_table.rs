@@ -3,6 +3,8 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+use core::fmt;
+
 use super::{ColMatrix, Trace};
 use air::{EvaluationFrame, TraceInfo, TraceLayout};
 use math::{FieldElement, StarkField};
@@ -63,6 +65,12 @@ pub struct TraceTable<B: StarkField> {
     layout: TraceLayout,
     trace: ColMatrix<B>,
     meta: Vec<u8>,
+}
+
+impl<B: StarkField> fmt::Display for TraceTable<B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.trace)
+    }
 }
 
 impl<B: StarkField> TraceTable<B> {

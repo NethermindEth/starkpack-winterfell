@@ -4,7 +4,7 @@
 // LICENSE file in the root directory of this source tree.
 
 use crate::StarkDomain;
-use core::{iter::FusedIterator, slice};
+use core::{fmt, iter::FusedIterator, slice};
 use crypto::{ElementHasher, MerkleTree};
 use math::{fft, polynom, FieldElement};
 use utils::{batch_iter_mut, collections::Vec, iter, iter_mut, uninit_vector};
@@ -30,6 +30,36 @@ use utils::iterators::*;
 #[derive(Debug, Clone)]
 pub struct ColMatrix<E: FieldElement> {
     columns: Vec<Vec<E>>,
+}
+
+impl<E: FieldElement> fmt::Display for ColMatrix<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // // Determine the maximum length of the numbers in the matrix
+        let max_length = self
+            .columns
+            .iter()
+            .flat_map(|col| col.iter())
+            .map(|e| e.to_string().len())
+            .max()
+            .unwrap_or(0);
+
+        let max_rows = self.columns.iter().map(|col| col.len()).max().unwrap_or(0);
+
+        for row in 0..max_rows {
+            for col in &self.columns {
+                if let Some(value) = col.get(row) {
+                    let value_str = value.to_string();
+                    // Pad the value with spaces to align
+                    write!(f, "{:width$}", value_str, width = max_length + 1)?;
+                } else {
+                    // Print spaces if there's no element in this row for the current column
+                    write!(f, "{:width$}", "", width = max_length + 1)?;
+                }
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
 }
 
 impl<E: FieldElement> ColMatrix<E> {

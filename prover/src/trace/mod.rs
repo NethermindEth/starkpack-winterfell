@@ -103,6 +103,7 @@ pub trait Trace: Sized {
         air: &A,
         aux_segments: &[ColMatrix<E>],
         aux_rand_elements: &AuxTraceRandElements<E>,
+        k: usize,
     ) where
         A: Air<BaseField = Self::BaseField>,
         E: FieldElement<BaseField = Self::BaseField>,
@@ -119,13 +120,14 @@ pub trait Trace: Sized {
         // --- 1. make sure the assertions are valid ----------------------------------------------
 
         // first, check assertions against the main segment of the execution trace
-        for assertion in air.get_assertions(self.main_trace_width()) {
+        for assertion in air.get_assertions(k) {
             assertion.apply(self.length(), |step, value| {
                 assert!(
                     value == self.main_segment().get(assertion.column(), step),
-                    "trace does not satisfy assertion main_trace({}, {}) == {}",
+                    "trace does not satisfy assertion main_trace({}, {}) = {} == {}",
                     assertion.column(),
                     step,
+                    self.main_segment().get(assertion.column(), step),
                     value
                 );
             });
@@ -191,7 +193,7 @@ pub trait Trace: Sized {
             // evaluate to zeros
             self.read_main_frame(step, &mut main_frame);
             air.evaluate_transition(
-                self.main_trace_width(),
+                k,
                 &main_frame,
                 &periodic_values,
                 &mut main_evaluations,
