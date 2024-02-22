@@ -12,18 +12,22 @@ pub use prover::{
 use std::time::Instant;
 pub use verifier::{verify, VerifierError};
 
-const NUM_COLS: usize = 64;
+const NUM_COLS: usize = 100;
 fn main() {
     let starting_vec: Vec<_> = (0..1_u128.pow(5)).map(|i| BaseElement::new(i)).collect();
-    let m = 2_usize.pow(20);
+    let m = 2_usize.pow(16);
     let n = starting_vec.len();
-    let k = 2_usize.pow(3);
+    let k = 2_usize.pow(1);
     // Build the execution trace and get the result from the last step.
     let now: Instant = Instant::now();
     let traces: Vec<_> = starting_vec
         .iter()
         .map(|&start| build_do_work_trace(start, m, k))
         .collect();
+    // for (i, trace) in traces.iter().enumerate() {
+    //     println!("Trace{}", i);
+    //     println!("{}", trace);
+    // }
     println!("Built execution Traces in {}ms", now.elapsed().as_millis());
 
     let results: Vec<_> = traces

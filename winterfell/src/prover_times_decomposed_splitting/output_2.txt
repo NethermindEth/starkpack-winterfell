@@ -1,0 +1,16 @@
+Built execution Traces in 1659ms
+Built domain of 2^21 elements in 29 ms
+Merkle trace and commit in 294123ms
+LDE time in 184ms
+AUX time in 0ms
+Validate time in 5194ms
+Evaluated constraints over domain of 2^19 elements in 9218 ms
+Converted constraint evaluations into 2 composition polynomial columns of degree 262143 in 9142 ms
+Built DEEP composition polynomial of degree 262142 in 12704 ms
+Evaluated DEEP composition polynomial over LDE domain (2^21 elements) in 2629 ms
+Computed 5 FRI layers from composition polynomial evaluations in 659 ms
+Determined 32 query positions in 0 ms
+Built proof object in 1 ms
+Generated the proof in 333901ms
+Proof size: 218.6 KB
+Proof verified in 5.6 ms
