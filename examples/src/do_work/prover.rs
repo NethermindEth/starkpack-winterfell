@@ -60,7 +60,7 @@ where
 }
 
 fn build_do_work_trace(start: BaseElement, trace_lenght: usize) -> TraceTable<BaseElement> {
-    let trace_width = 10;
+    let trace_width = 275;
     let mut trace = TraceTable::new(trace_width, trace_lenght);
     trace.fill(
         |state| {

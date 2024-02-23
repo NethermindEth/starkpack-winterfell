@@ -20,7 +20,7 @@ pub fn get_example(
     num_traces: usize,
     trace_lenght: usize,
 ) -> Result<Box<dyn Example>, String> {
-    let (options, hash_fn) = options.to_proof_options(31, 8);
+    let (options, hash_fn) = options.to_proof_options(32, 8);
     println!("Getting example");
 
     match hash_fn {
@@ -98,7 +98,7 @@ where
         let now = Instant::now();
         let traces = prover.build_do_work_traces(&self.starting_vec, self.trace_lenght);
         debug!(
-            "Generated execution trace of {} registers and 2^{} steps in {} ms",
+            "Generated execution trace of {} registers and {} steps in {} ms",
             traces[0].width(),
             traces[0].length(),
             now.elapsed().as_millis()

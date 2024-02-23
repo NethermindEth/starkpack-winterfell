@@ -99,7 +99,7 @@ impl ExampleOptions {
                 8,
                 0,
                 FieldExtension::None,
-                4,
+                8,
                 31,
             ),
             hash_fn,
