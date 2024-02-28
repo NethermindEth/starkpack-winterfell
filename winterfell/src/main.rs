@@ -12,12 +12,18 @@ pub use prover::{
 use std::time::Instant;
 pub use verifier::{verify, VerifierError};
 
-const NUM_COLS: usize = 100;
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+const NUM_COLS: usize = 275;
 fn main() {
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
     let starting_vec: Vec<_> = (0..1_u128.pow(5)).map(|i| BaseElement::new(i)).collect();
     let m = 2_usize.pow(16);
     let n = starting_vec.len();
-    let k = 2_usize.pow(1);
+    let k = 2_usize.pow(6);
     // Build the execution trace and get the result from the last step.
     let now: Instant = Instant::now();
     let traces: Vec<_> = starting_vec

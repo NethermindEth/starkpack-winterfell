@@ -266,11 +266,6 @@ pub trait Prover {
             domain.lde_domain_size().ilog2(),
             now.elapsed().as_millis()
         );
-        println!(
-            "Built domain of 2^{} elements in {} ms",
-            domain.lde_domain_size().ilog2(),
-            now.elapsed().as_millis()
-        );
 
         // extend the main execution trace and build a Merkle tree from the extended trace
         let merkle_commit_time = Instant::now();
@@ -288,10 +283,6 @@ pub trait Prover {
         // manually as the #derive(Clone) didn't work
         //let main_trace1_tree = main_trace_tree.clone();
         channel.commit_trace(*main_trace_tree.root());
-        println!(
-            "Merkle trace and commit in {}ms",
-            merkle_commit_time.elapsed().as_millis()
-        );
         // initialize trace commitment and trace polynomial table structs with the main trace
         // data; for multi-segment traces these structs will be used as accumulators of all
         // trace segments
@@ -308,7 +299,6 @@ pub trait Prover {
             .into_iter()
             .map(|main_trace_polys| TracePolyTable::new(main_trace_polys.to_owned()))
             .collect();
-        println!("LDE time in {}ms", lde_time.elapsed().as_millis());
 
         // build auxiliary trace segments (if any), and append the resulting segments to trace
         // commitment and trace polynomial table structs
@@ -368,7 +358,6 @@ pub trait Prover {
                 aux_traces_segments[i].push(aux_segments[i].to_owned());
             }
         }
-        println!("AUX time in {}ms", aux_time.elapsed().as_millis());
 
         // make sure the specified trace (including auxiliary segments) is valid against the AIR.
         // This checks validity of both, assertions and state transitions. We do this in debug
@@ -390,7 +379,6 @@ pub trait Prover {
                 trace.validate(&airs[i], &empty_col_matrix, &empty_rand_elements, k);
             }
         }
-        println!("Validate time in {}ms", validate_time.elapsed().as_millis());
 
         // 2 ----- evaluate constraints -----------------------------------------------------------
         // evaluate constraints specified by the AIR over the constraint evaluation domain, and
@@ -436,11 +424,6 @@ pub trait Prover {
 
         #[cfg(feature = "std")]
         debug!(
-            "Evaluated constraints over domain of 2^{} elements in {} ms",
-            constraint_evaluations_vec[0].num_rows().ilog2(),
-            now.elapsed().as_millis()
-        );
-        println!(
             "Evaluated constraints over domain of 2^{} elements in {} ms",
             constraint_evaluations_vec[0].num_rows().ilog2(),
             now.elapsed().as_millis()
@@ -500,12 +483,6 @@ pub trait Prover {
         // then, commit to the evaluations of constraints by writing the root of the constraint
         // Merkle tree into the channel
         channel.commit_constraints(constraint_commitment.root());
-        println!(
-            "Converted constraint evaluations into {} composition polynomial columns of degree {} in {} ms",
-            final_poly.num_columns(),
-            final_poly.column_degree(),
-            now.elapsed().as_millis()
-        );
         // 4 ----- build DEEP composition polynomial ----------------------------------------------
         #[cfg(feature = "std")]
         let now = Instant::now();
@@ -562,11 +539,6 @@ pub trait Prover {
             deep_composition_poly.degree(),
             now.elapsed().as_millis()
         );
-        println!(
-            "Built DEEP composition polynomial of degree {} in {} ms",
-            deep_composition_poly.degree(),
-            now.elapsed().as_millis()
-        );
 
         // make sure the degree of the DEEP composition polynomial is equal to trace polynomial
         // degree
@@ -591,11 +563,6 @@ pub trait Prover {
             domain.lde_domain_size().ilog2(),
             now.elapsed().as_millis()
         );
-        println!(
-            "Evaluated DEEP composition polynomial over LDE domain (2^{} elements) in {} ms",
-            domain.lde_domain_size().ilog2(),
-            now.elapsed().as_millis()
-        );
 
         // 6 ----- compute FRI layers for the composition polynomial ------------------------------
         #[cfg(feature = "std")]
@@ -604,11 +571,6 @@ pub trait Prover {
         fri_prover.build_layers(&mut channel, deep_evaluations);
         #[cfg(feature = "std")]
         debug!(
-            "Computed {} FRI layers from composition polynomial evaluations in {} ms",
-            fri_prover.num_layers(),
-            now.elapsed().as_millis()
-        );
-        println!(
             "Computed {} FRI layers from composition polynomial evaluations in {} ms",
             fri_prover.num_layers(),
             now.elapsed().as_millis()
@@ -625,11 +587,6 @@ pub trait Prover {
         let query_positions = channel.get_query_positions();
         #[cfg(feature = "std")]
         debug!(
-            "Determined {} query positions in {} ms",
-            query_positions.len(),
-            now.elapsed().as_millis()
-        );
-        println!(
             "Determined {} query positions in {} ms",
             query_positions.len(),
             now.elapsed().as_millis()
@@ -653,7 +610,6 @@ pub trait Prover {
         let proof = channel.build_proof(trace_queries, constraint_queries, fri_proof);
         #[cfg(feature = "std")]
         debug!("Built proof object in {} ms", now.elapsed().as_millis());
-        println!("Built proof object in {} ms", now.elapsed().as_millis());
         Ok(proof)
     }
 

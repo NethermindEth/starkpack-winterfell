@@ -6,7 +6,7 @@ cp main.rs main.rs.bak
 PATTERN="let k = 2_usize.pow([0-9]);"
 
 # Loop from 0 to 17
-for i in {0..17}; do
+for i in {0..7}; do
     # Use sed to replace SOME_NUMBER with the current iteration number
     sed -i.bak "s/$PATTERN/let k = 2_usize.pow($i);/" main.rs
     rg "let k = 2_usize"
