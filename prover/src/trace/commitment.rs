@@ -15,9 +15,9 @@ use utils::collections::Vec;
 
 /// Execution trace commitment.
 ///
-/// The describes one or more trace segments, each consisting of the following components:
-/// * Evaluations of a trace segment's polynomials over the LDE domain.
-/// * Merkle tree where each leaf in the tree corresponds to a row in the trace LDE matrix.
+/// The describes one or more traces segments, each consisting of the following components:
+/// * Evaluations of a traces segment's polynomials over the LDE domain.
+/// * Merkle tree where each leaf in the tree corresponds to the combination of the rows of each trace's LDE matrix.
 pub struct TraceCommitment<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> {
     traces_lde: Vec<TraceLde<E>>,
     main_segment_tree: MerkleTree<H>,
@@ -28,7 +28,7 @@ pub struct TraceCommitment<E: FieldElement, H: ElementHasher<BaseField = E::Base
 impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitment<E, H> {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    /// Creates a new trace commitment from the provided main trace low-degree extension and the
+    /// Creates a new traces commitment from the provided main traces low-degree extension and the
     /// corresponding Merkle tree commitment.
     pub fn new(
         main_traces_lde: Vec<RowMatrix<E::BaseField>>,
@@ -74,7 +74,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns the execution trace for this commitment.
+    /// Returns the i-th execution trace for this commitment.
     ///
     /// The trace contains both the main trace segment and the auxiliary trace segments (if any).
     pub fn trace_table(&self, i: usize) -> &TraceLde<E> {
@@ -85,7 +85,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
     /// Returns trace table rows at the specified positions along with Merkle authentication paths
     /// from the commitment root to these rows.
     pub fn query(&self, positions: &[usize]) -> Vec<JointTraceQueries> {
-        // build queries for the main trace segment
+        // build queries for the main traces segment
         let traces_main_segment = self
             .traces_lde
             .iter()
@@ -119,7 +119,7 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceCommitmen
         *self.main_segment_tree.root()
     }
 
-    /// Returns the entire trace for the column at the specified index.
+    /// Returns the entire i'th trace for the column at the specified index.
     #[cfg(test)]
     pub fn get_main_trace_column(&self, col_idx: usize, i: usize) -> Vec<E::BaseField> {
         let trace = self.traces_lde[i].get_main_segment();
@@ -151,6 +151,7 @@ where
             .collect::<Vec<_>>();
         traces_states.push(trace_states);
     }
+    //Take the first trace's state and then concat all the next traces' states to get the combined state
     let first_states = traces_states.first().unwrap().to_owned();
     let comb_states = first_states
         .into_iter()
@@ -160,27 +161,12 @@ where
                 .iter()
                 .fold(row, |mut acc, next_trace_states| {
                     let next_trace_row = next_trace_states.iter().nth(i).unwrap().to_owned();
-                    // TODO^ Check why is extend not working
                     acc = [acc, next_trace_row].concat();
                     acc
                 })
         })
         .collect();
 
-    // Leaving this code here for checking
-    /* let mut comb_states = Vec::with_capacity(first_states.len());
-    let rem_traces_states: Vec<_> = traces_states.iter().skip(1).collect();
-    for (i, row) in first_states.iter().enumerate() {
-        let trace_row = row[..].to_vec();
-        //let trace1_row = &trace1_states[i][..];
-        comb_states.push(
-            rem_traces_states
-                .into_iter()
-                .fold(trace_row, |acc, next_trace_states| {
-                    [trace_row, next_trace_states[i][..].to_vec()].concat()
-                }),
-        );
-    }
     // build Merkle authentication paths to the leaves specified by positions */
     let trace_proof = segment_tree
         .prove_batch(positions)

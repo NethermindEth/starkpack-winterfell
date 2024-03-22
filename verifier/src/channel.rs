@@ -299,23 +299,13 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> Clone for Trac
 }
 
 impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E, H> {
-    /// Parses the provided trace queries into trace states in the specified field and
+    /// Parses the provided traces queries into trace states in the specified field and
     /// corresponding Merkle authentication paths.
     pub fn new<A: Air<BaseField = E::BaseField>>(
         mut queries: Vec<JointTraceQueries>,
         airs: &Vec<A>,
     ) -> Result<Self, VerifierError> {
-        /*for air in airs.iter() {
-            assert_eq!(
-                queries.len(),
-                air.trace_layout().num_segments(),
-                "expected {} trace segment queries, but received {}",
-                air.trace_layout().num_segments(),
-                queries.len()
-            );
-        }*/
-
-        /////
+        //Here we use the first AIR as th en number of queries must be the same for all the traces
         let num_queries = airs[0].options().num_queries();
 
         // parse main trace segment queries; parsing also validates that hashes of each table row
@@ -365,16 +355,9 @@ impl<E: FieldElement, H: ElementHasher<BaseField = E::BaseField>> TraceQueries<E
             }
 
             // merge tables for each auxiliary segment into a single table
-
-            //This may look extremly odd so here is an explanation
             //Let's denote n = {The number of traces in starkpack}
-            //m = {The number of aux_segments in each trace}(We assume that the number of segmets is equall for each trace)
-            //The original Winterfell would iterate over m (line351) get the segments and merge them into one table.
-            //In our case during the each iteration we get not 1 segment but a pack of n segments
-            // so a matrix of size m*n
-            //but we need a matrix of size n*m
-            //that's why I rearrange the matrix m*n-> n*m
-            //And merge each row into a table.
+            //m = {The number of aux_segments in each trace}(The number of segmets must be the same for all the traces)
+            //The matrix's shape is currently m*n but to have a single table the matrix first needs to be reshaped to n*m
             let mut aux_traces_states = Vec::new();
             for i in 0..n {
                 let mut aux_table_states = Vec::new();
