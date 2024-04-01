@@ -22,23 +22,19 @@ fn main() {
     let _profiler = dhat::Profiler::new_heap();
     let starting_vec: Vec<_> = (0..1_u128.pow(5)).map(|i| BaseElement::new(i)).collect();
     let m = 2_usize.pow(16);
-    let n = starting_vec.len();
-    let k = 2_usize.pow(6);
+    let num_traces = starting_vec.len();
+    let num_splits = 2_usize.pow(6);
     // Build the execution trace and get the result from the last step.
     let now: Instant = Instant::now();
     let traces: Vec<_> = starting_vec
         .iter()
-        .map(|&start| build_do_work_trace(start, m, k))
+        .map(|&start| build_do_work_trace(start, m, num_splits))
         .collect();
-    // for (i, trace) in traces.iter().enumerate() {
-    //     println!("Trace{}", i);
-    //     println!("{}", trace);
-    // }
     println!("Built execution Traces in {}ms", now.elapsed().as_millis());
 
     let results: Vec<_> = traces
         .iter()
-        .map(|trace| trace.get(NUM_COLS * (k - 1), m / k - 1))
+        .map(|trace| trace.get(NUM_COLS * (num_splits - 1), m / num_splits - 1))
         .collect();
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(
@@ -52,15 +48,13 @@ fn main() {
     // Instantiate the prover and generate the proof.
     let prover = WorkProver::new(options);
     let now: Instant = Instant::now();
-    let proof = prover.prove(k, n, traces).unwrap();
+    let proof = prover.prove(num_splits, num_traces, traces).unwrap();
     println!("Generated the proof in {}ms", now.elapsed().as_millis());
 
     let proof_bytes: Vec<u8> = proof.to_bytes();
     println!("Proof size: {:.1} KB", proof_bytes.len() as f64 / 1024f64);
     //println!("Proof Security: {} bits", proof.security_level(true));
 
-    //let parsed_proof: StarkProof = StarkProof::from_bytes(&proof_bytes).unwrap();
-    //assert_eq!(proof, parsed_proof);
     // Verify the proof. The number of steps and options are encoded in the proof itself,
     // so we don't need to pass them explicitly to the verifier.
     let pub_inputs_vec = starting_vec
@@ -72,7 +66,7 @@ fn main() {
     match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
         proof,
         pub_inputs_vec,
-        k,
+        num_splits,
     ) {
         Ok(_) => {
             println!(
@@ -85,41 +79,31 @@ fn main() {
         }
     }
 }
-pub fn build_do_work_trace(start: BaseElement, n: usize, k: usize) -> TraceTable<BaseElement> {
-    let trace_width: usize = NUM_COLS * k;
-    let mut trace = TraceTable::new(trace_width, n / k);
-    //mod k
+pub fn build_do_work_trace(start: BaseElement, n: usize, num_splits: usize) -> TraceTable<BaseElement> {
+    let trace_width: usize = NUM_COLS * num_splits;
+    let mut trace = TraceTable::new(trace_width, n / num_splits);
+    //mod num_splits
+    /// In the STARKPack paper, the splitting technique is described as dividing the execution trace into num_splits subtraces during proof generation,
+    /// subsequently merging their respective composition polynomials into a single composition polynomial. 
+    /// However, this approach is challenging and less efficient for Winterfell's framework.
+    /// Instead, Winterfell adopts a more straightforward implementation strategy, which involves not splitting the trace during proof generation. 
+    /// Rather, it takes a reshaped trace(num_splits times shorter and num_splits times wider)as its input, streamlining the process.
     trace.fill(
         |state| {
             state[0] = start;
-            for idx in 1..k {
+            for idx in 1..num_splits {
                 state[NUM_COLS * idx] =
                     state[NUM_COLS * (idx - 1)].exp(3u32.into()) + BaseElement::new(42);
             }
         },
         |_, state| {
-            state[0] = state[NUM_COLS * (k - 1)].exp(3u32.into()) + BaseElement::new(42);
-            for idx in 1..k {
+            state[0] = state[NUM_COLS * (num_splits - 1)].exp(3u32.into()) + BaseElement::new(42);
+            for idx in 1..num_splits {
                 state[NUM_COLS * idx] =
                     state[NUM_COLS * (idx - 1)].exp(3u32.into()) + BaseElement::new(42);
             }
         },
     );
-    //sequential
-    // trace.fill(
-    //     |state| {
-    //         state[0] = start;
-    //         for idx in 1..k {
-    //             state[idx] = state[idx - 1].exp(3u32.into()) + BaseElement::new(42);
-    //         }
-    //     },
-    //     |_, state| {
-    //         state[0] = state[k - 1].exp(3u32.into()) + BaseElement::new(42);
-    //         for idx in 1..k {
-    //             state[idx] = state[idx - 1].exp(3u32.into()) + BaseElement::new(42);
-    //         }
-    //     },
-    // );
     trace
 }
 // Public inputs for our computation will consist of the starting value and the end result.
@@ -146,10 +130,10 @@ impl Air for WorkAir {
         trace_info: TraceInfo,
         pub_inputs: PublicInputs,
         options: ProofOptions,
-        k: usize,
+        num_splits: usize,
     ) -> Self {
-        assert_eq!(NUM_COLS * k, trace_info.width());
-        let degrees = vec![TransitionConstraintDegree::new(3); k];
+        assert_eq!(NUM_COLS * num_splits, trace_info.width());
+        let degrees = vec![TransitionConstraintDegree::new(3); num_splits];
         WorkAir {
             context: AirContext::new(trace_info, degrees, 2, options),
             start: pub_inputs.start,
@@ -158,24 +142,24 @@ impl Air for WorkAir {
     }
     fn evaluate_transition<E: FieldElement + From<Self::BaseField>>(
         &self,
-        k: usize,
+        num_splits: usize,
         frame: &EvaluationFrame<E>,
         _periodic_values: &[E],
         result: &mut [E],
     ) {
         let current = &frame.current();
         let next = &frame.next();
-        for idx in 0..k - 1 {
+        for idx in 0..num_splits - 1 {
             result[idx] = current[NUM_COLS * idx].exp(3u32.into()) + E::from(42u32)
                 - current[NUM_COLS * (idx + 1)];
         }
-        result[k - 1] = current[NUM_COLS * (k - 1)].exp(3u32.into()) + E::from(42u32) - next[0];
+        result[num_splits - 1] = current[NUM_COLS * (num_splits - 1)].exp(3u32.into()) + E::from(42u32) - next[0];
     }
-    fn get_assertions(&self, k: usize) -> Vec<Assertion<Self::BaseField>> {
+    fn get_assertions(&self, num_splits: usize) -> Vec<Assertion<Self::BaseField>> {
         let last_step = self.trace_length() - 1;
         vec![
             Assertion::single(0, 0, self.start),
-            Assertion::single(NUM_COLS * (k - 1), last_step, self.result),
+            Assertion::single(NUM_COLS * (num_splits - 1), last_step, self.result),
         ]
     }
     fn context(&self) -> &AirContext<Self::BaseField> {
@@ -196,11 +180,11 @@ impl Prover for WorkProver {
     type Trace = TraceTable<Self::BaseField>;
     type HashFn = Blake3_256<Self::BaseField>;
     type RandomCoin = DefaultRandomCoin<Self::HashFn>;
-    fn get_pub_inputs(&self, trace: &Self::Trace, k: usize) -> PublicInputs {
+    fn get_pub_inputs(&self, trace: &Self::Trace, num_splits: usize) -> PublicInputs {
         let last_step = trace.length() - 1;
         PublicInputs {
             start: trace.get(0, 0),
-            result: trace.get(NUM_COLS * (k - 1), last_step),
+            result: trace.get(NUM_COLS * (num_splits - 1), last_step),
         }
     }
     fn options(&self) -> &ProofOptions {

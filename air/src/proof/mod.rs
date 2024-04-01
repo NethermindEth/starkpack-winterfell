@@ -171,7 +171,6 @@ impl StarkProof {
         // parse trace queries
         //Here the first context is used as all the contex.trace_layouts should be identical
         let num_trace_segments = contexts[0].trace_layout().num_segments();
-        //We may need to change something here!!
         let mut trace_queries = Vec::with_capacity(num_trace_segments);
         for _ in 0..num_trace_segments {
             trace_queries.push(JointTraceQueries::read_from(&mut source)?);

@@ -36,7 +36,7 @@ pub struct BatchMerkleProof<H: Hasher> {
     /// Depth of the leaves
     pub depth: u8,
 }
-
+//TODO:check if this is the best implementation of the cloning.
 impl<H: Hasher> Clone for BatchMerkleProof<H> {
     fn clone(&self) -> Self {
         BatchMerkleProof {

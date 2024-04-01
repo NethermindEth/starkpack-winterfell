@@ -83,7 +83,7 @@ pub use errors::VerifierError;
 pub fn verify<AIR, HashFn, RandCoin>(
     proof: StarkProof,
     pub_inputs_vec: Vec<AIR::PublicInputs>,
-    k:usize,
+    num_splits:usize,
 ) -> Result<(), VerifierError> 
 where 
     AIR: Air, 
@@ -100,7 +100,7 @@ where
     }
     
     // create AIRs instances for the computations specified in the proof
-    let airs: Vec<_> = pub_inputs_vec.into_iter().enumerate().map(|(i, pub_inputs)| AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).to_owned(),k)).collect();
+    let airs: Vec<_> = pub_inputs_vec.into_iter().enumerate().map(|(i, pub_inputs)| AIR::new(proof.get_trace_info(i), pub_inputs, proof.options(i).to_owned(),num_splits)).collect();
 
     // figure out which version of the generic proof verification procedure to run. this is a sort
     // of static dispatch for selecting two generic parameter: extension field and hash function.
@@ -110,7 +110,7 @@ where
             let public_coin = RandCoin::new(&public_coin_seed);
             match VerifierChannel::new(&airs, proof) {
                 Ok(channel) => {
-                    perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(k,&airs, channel, public_coin)
+                    perform_verification::<AIR, AIR::BaseField, HashFn, RandCoin>(num_splits,&airs, channel, public_coin)
                 },
                 Err(err) => {
                     println!("Err: {}", err);
@@ -124,7 +124,7 @@ where
             }
             let public_coin = RandCoin::new(&public_coin_seed);
             let channel = VerifierChannel::new(&airs, proof)?;
-            perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(k,&airs, channel, public_coin)
+            perform_verification::<AIR, QuadExtension<AIR::BaseField>, HashFn, RandCoin>(num_splits,&airs, channel, public_coin)
         },
         FieldExtension::Cubic => {
             if !<CubeExtension<AIR::BaseField>>::is_supported() {
@@ -133,7 +133,7 @@ where
             let public_coin = RandCoin::new(&public_coin_seed);
             let channel = VerifierChannel::new(&
                 airs, proof)?;
-            perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(k,&airs, channel, public_coin)
+            perform_verification::<AIR, CubeExtension<AIR::BaseField>, HashFn, RandCoin>(num_splits,&airs, channel, public_coin)
         },
     }
 }
@@ -143,7 +143,7 @@ where
 /// Performs the actual verification by reading the data from the `channel` and making sure it
 /// attests to a correct execution of the computations specified by the provided `airs`.
 fn perform_verification<A, E, H, R>(
-    k: usize,
+    num_splits: usize,
     airs: &Vec<A>,
     mut channel: VerifierChannel<E, H>,
     mut public_coin: R,
@@ -225,7 +225,7 @@ where
         let constraints_coeffs_i = &constraints_coeffs[i];
         let aux_trace_rand_elements_i = &aux_traces_rand_elements[i];
         let ood_constraint_evaluation_1 = evaluate_constraints(
-            k,
+            num_splits,
             &airs[i],
             constraints_coeffs_i.to_owned(),
             &ood_main_traces_frame[i],

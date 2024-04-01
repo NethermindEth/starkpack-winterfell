@@ -40,7 +40,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
     /// Returns a new evaluator which can be used to evaluate transition and boundary constraints
     /// over extended execution trace.
     pub fn new(
-        k: usize,
+        num_splits: usize,
         air: &'a A,
         aux_rand_elements: AuxTraceRandElements<E>,
         composition_coefficients: ConstraintCompositionCoefficients<E>,
@@ -56,7 +56,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
         // build boundary constraint groups; these will be used to evaluate and compose boundary
         // constraint evaluations.
         let boundary_constraints = BoundaryConstraints::new(
-            k,
+            num_splits,
             air,
             &aux_rand_elements,
             &composition_coefficients.boundary,
@@ -78,7 +78,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
     /// evaluation domain can be many times smaller than the full LDE domain.
     pub fn evaluate(
         self,
-        k: usize,
+        num_splits: usize,
         trace: &TraceLde<E>,
         domain: &'a StarkDomain<E::BaseField>,
     ) -> ConstraintEvaluationTable<'a, E> {
@@ -125,7 +125,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
             if self.air.trace_info().is_multi_segment() {
                 self.evaluate_fragment_full(trace, domain, fragment);
             } else {
-                self.evaluate_fragment_main(k, trace, domain, fragment);
+                self.evaluate_fragment_main(num_splits, trace, domain, fragment);
             }
         });
 
@@ -145,7 +145,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
     /// This evaluates constraints only over the main segment of the execution trace.
     fn evaluate_fragment_main(
         &self,
-        k: usize,
+        num_splits: usize,
         trace: &TraceLde<E>,
         domain: &StarkDomain<A::BaseField>,
         fragment: &mut EvaluationTableFragment<E>,
@@ -171,7 +171,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
             // evaluate transition constraints and save the merged result the first slot of the
             // evaluations buffer
             evaluations[0] = self.evaluate_main_transition(
-                k,
+                num_splits,
                 &main_frame,
                 step,
                 &mut t_evaluations,
@@ -268,7 +268,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
     #[rustfmt::skip]
     fn evaluate_main_transition(
         &self,
-        k:usize,
+        num_splits:usize,
         main_frame: &EvaluationFrame<E::BaseField>,
         step: usize,
         evaluations: &mut [E::BaseField],
@@ -281,7 +281,7 @@ impl<'a, A: Air, E: FieldElement<BaseField = A::BaseField>> ConstraintEvaluator<
 
         // evaluate transition constraints over the main segment of the execution trace and save
         // the results into evaluations buffer
-        self.air.evaluate_transition(k, main_frame, periodic_values, evaluations);
+        self.air.evaluate_transition(num_splits, main_frame, periodic_values, evaluations);
 
         // merge transition constraint evaluations into a single value and return it;
         // we can do this here because all transition constraints have the same divisor.

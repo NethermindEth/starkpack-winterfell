@@ -147,7 +147,7 @@ pub trait Prover {
     fn get_pub_inputs(
         &self,
         trace: &Self::Trace,
-        k: usize,
+        num_splits: usize,
     ) -> <<Self as Prover>::Air as Air>::PublicInputs;
 
     /// Returns [ProofOptions] which this prover uses to generate STARK proofs.
@@ -168,22 +168,22 @@ pub trait Prover {
     /// secret and public inputs. Public inputs must match the value returned from
     /// [Self::get_pub_inputs()](Prover::get_pub_inputs) for the provided traces.
     #[rustfmt::skip]
-    fn prove(&self, k:usize, n:usize, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
+    fn prove(&self, num_splits:usize, n:usize, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
         // figure out which version of the generic proof generation procedure to run. this is a sort
         // of static dispatch for selecting two generic parameter: extension field and hash function.
         match self.options().field_extension() {
-            FieldExtension::None => self.generate_proof::<Self::BaseField>(k, n, traces),
+            FieldExtension::None => self.generate_proof::<Self::BaseField>(num_splits, n, traces),
             FieldExtension::Quadratic => {
                 if !<QuadExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(2));
                 }
-                self.generate_proof::<QuadExtension<Self::BaseField>>(k, n, traces)
+                self.generate_proof::<QuadExtension<Self::BaseField>>(num_splits, n, traces)
             }
             FieldExtension::Cubic => {
                 if !<CubeExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(3));
                 }
-                self.generate_proof::<CubeExtension<Self::BaseField>>(k, n, traces)
+                self.generate_proof::<CubeExtension<Self::BaseField>>(num_splits, n, traces)
             }
         }
     }
@@ -197,7 +197,7 @@ pub trait Prover {
     #[doc(hidden)]
     fn generate_proof<E>(
         &self,
-        k: usize,
+        num_splits: usize,
         n: usize,
         mut traces: Vec<Self::Trace>,
     ) -> Result<StarkProof, ProverError>
@@ -209,7 +209,7 @@ pub trait Prover {
         // serialize public inputs; these will be included in the seed for the public coin
         let pub_inputs_vec: Vec<_> = traces
             .iter()
-            .map(|trace| self.get_pub_inputs(trace, k))
+            .map(|trace| self.get_pub_inputs(trace, num_splits))
             .collect();
         let pub_inputs_elements_vec = pub_inputs_vec
             .iter()
@@ -223,7 +223,7 @@ pub trait Prover {
             .iter()
             .zip(pub_inputs_vec)
             .map(|(trace, pub_inputs)| {
-                Self::Air::new(trace.get_info(), pub_inputs, self.options().clone(), k)
+                Self::Air::new(trace.get_info(), pub_inputs, self.options().clone(), num_splits)
             })
             .collect();
 
@@ -364,11 +364,11 @@ pub trait Prover {
                 // of the same size
                 .nth(i)
             {
-                trace.validate(&airs[i], aux_trace_segments, aux_trace_rand_elements, k);
+                trace.validate(&airs[i], aux_trace_segments, aux_trace_rand_elements, num_splits);
             } else {
                 let empty_col_matrix = Vec::new();
                 let empty_rand_elements = AuxTraceRandElements::<E>::new();
-                trace.validate(&airs[i], &empty_col_matrix, &empty_rand_elements, k);
+                trace.validate(&airs[i], &empty_col_matrix, &empty_rand_elements, num_splits);
             }
         }
 
@@ -386,21 +386,21 @@ pub trait Prover {
             let constraint_coeffs = channel.get_constraint_composition_coeffs();
             if let Some(aux_trace_rand_elements) = aux_traces_rand_elements.iter().nth(i) {
                 let evaluator = ConstraintEvaluator::new(
-                    k,
+                    num_splits,
                     air,
                     aux_trace_rand_elements.to_owned(),
                     constraint_coeffs,
                 );
                 let constraint_evaluations =
-                    evaluator.evaluate(k, trace_commitment.trace_table(i), &domain);
+                    evaluator.evaluate(num_splits, trace_commitment.trace_table(i), &domain);
                 constraint_evaluations_vec.push(constraint_evaluations);
             } else {
                 let empty_rand_elements = AuxTraceRandElements::<E>::new();
                 let evaluator =
-                    ConstraintEvaluator::new(k, air, empty_rand_elements, constraint_coeffs);
+                    ConstraintEvaluator::new(num_splits, air, empty_rand_elements, constraint_coeffs);
 
                 let constraint_evaluations =
-                    evaluator.evaluate(k, trace_commitment.trace_table(i), &domain);
+                    evaluator.evaluate(num_splits, trace_commitment.trace_table(i), &domain);
                 constraint_evaluations_vec.push(constraint_evaluations);
             }
         }
@@ -542,6 +542,7 @@ pub trait Prover {
         // 6 ----- compute FRI layers for the composition polynomial ------------------------------
         #[cfg(feature = "std")]
         let now = Instant::now();
+        //Here the first air is used beacause all the airs are identical
         let mut fri_prover = FriProver::new(airs[0].options().to_fri_options());
         fri_prover.build_layers(&mut channel, deep_evaluations);
         #[cfg(feature = "std")]
