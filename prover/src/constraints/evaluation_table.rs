@@ -161,7 +161,7 @@ impl<'a, E: FieldElement> ConstraintEvaluationTable<'a, E> {
     /// the coefficients of the constraint composition polynomial and is needed by
     /// `CompositionPoly::new`.
 
-    /// The functions into_comb_poly() and into_poly() wotk in tandem
+    /// The functions into_comb_poly() and into_poly() wotk in tandem.
     /// Initially, into_comb_poly() generates the composition polynomials in vector form. 
     /// Once these vectors are combined into the final polynomial, 
     /// into_poly() then transforms this final polynomial into matrix form.

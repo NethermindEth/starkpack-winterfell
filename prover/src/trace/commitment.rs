@@ -160,7 +160,7 @@ where
             traces_states[1..]
                 .iter()
                 .fold(row, |mut acc, next_trace_states| {
-                    let next_trace_row = next_trace_states.iter().nth(i).unwrap().to_owned();
+                    let next_trace_row = next_trace_states.get(i).unwrap().to_owned();
                     acc = [acc, next_trace_row].concat();
                     acc
                 })

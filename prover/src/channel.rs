@@ -73,7 +73,7 @@ where
         // info sent to the verifier
         let mut coin_seed_elements: Vec<<A as Air>::BaseField> =
             contexts.first().unwrap().to_elements();
-        for mut pub_inputs_elements in pub_inputs_elements_vec.to_owned() {
+        for mut pub_inputs_elements in pub_inputs_elements_vec.iter().cloned() {
             coin_seed_elements.append(&mut pub_inputs_elements);
         }
 

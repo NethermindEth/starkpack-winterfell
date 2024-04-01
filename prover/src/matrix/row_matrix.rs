@@ -209,7 +209,7 @@ impl<E: FieldElement> RowMatrix<E> {
     ///   becomes a leaf in the tree. Thus, the number of leaves in the tree is equal to the
     ///   number of rows in the first matrix(all the matrixes must have the same length).
     /// * The resulting Merkle tree is returned as the commitment to the entire vector of matrixes.
-    pub fn commit_to_comb_rows<H>(&self, traces_lde: &Vec<RowMatrix<E>>) -> MerkleTree<H>
+    pub fn commit_to_comb_rows<H>(&self, traces_lde: &[RowMatrix<E>]) -> MerkleTree<H>
     where
         H: ElementHasher<BaseField = E::BaseField>,
     {

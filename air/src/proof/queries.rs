@@ -303,7 +303,7 @@ impl JointTraceQueries {
             Table::<E>::from_bytes(&self.values, num_queries, values_of_all_queries)?;
         let mut query_value_vec = Vec::new();
         for (value, values_per_query) in self.value_vec.iter().zip(values_per_query_vec.iter()) {
-            let query_value = Table::<E>::from_bytes(&value, num_queries, *values_per_query)?;
+            let query_value = Table::<E>::from_bytes(value, num_queries, *values_per_query)?;
             query_value_vec.push(query_value);
         }
         //let query_value = Table::<E>::from_bytes(&self.value, num_queries, values_per_query)?;

@@ -16,7 +16,7 @@ pub use verifier::{verify, VerifierError};
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
-const NUM_COLS: usize = 275;
+const NUM_COLS: usize = 1;
 fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
@@ -59,7 +59,7 @@ fn main() {
     // so we don't need to pass them explicitly to the verifier.
     let pub_inputs_vec = starting_vec
         .into_iter()
-        .zip(results.into_iter())
+        .zip(results)
         .map(|(start, result)| PublicInputs { start, result })
         .collect();
     let now: Instant = Instant::now();

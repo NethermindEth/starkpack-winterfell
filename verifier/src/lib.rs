@@ -144,7 +144,7 @@ where
 /// attests to a correct execution of the computations specified by the provided `airs`.
 fn perform_verification<A, E, H, R>(
     num_splits: usize,
-    airs: &Vec<A>,
+    airs: &[A],
     mut channel: VerifierChannel<E, H>,
     mut public_coin: R,
 ) -> Result<(), VerifierError>

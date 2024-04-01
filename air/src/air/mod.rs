@@ -528,7 +528,7 @@ pub trait Air: Send + Sync {
     /// composition polynomial.
     fn get_deep_composition_coefficients<A: Air, E, R>(
         &self,
-        airs: &Vec<A>,
+        airs: &[A],
         public_coin: &mut R,
     ) -> Result<DeepCompositionCoefficients<E>, RandomCoinError>
     where

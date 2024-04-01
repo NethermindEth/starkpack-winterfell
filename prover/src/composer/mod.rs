@@ -142,7 +142,7 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
         let final_trace_poly = rem_polys
             .into_iter()
             .fold(first_poly, |mut acc, next_poly| {
-                add_in_place(&mut acc, &next_poly);
+                add_in_place(&mut acc, next_poly);
                 acc
             });
         // set the coefficients of the DEEP composition polynomial
