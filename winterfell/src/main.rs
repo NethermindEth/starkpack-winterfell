@@ -83,10 +83,11 @@ pub fn build_do_work_trace(start: BaseElement, n: usize, num_splits: usize) -> T
     let trace_width: usize = NUM_COLS * num_splits;
     let mut trace = TraceTable::new(trace_width, n / num_splits);
     //mod num_splits
+    //TODO: make this more understandable
     /// In the STARKPack paper, the splitting technique is described as dividing the execution trace into num_splits subtraces during proof generation,
     /// subsequently merging their respective composition polynomials into a single composition polynomial. 
     /// However, this approach is challenging and less efficient for Winterfell's framework.
-    /// Instead, Winterfell adopts a more straightforward implementation strategy, which involves not splitting the trace during proof generation. 
+    /// Instead, We adopt a more straightforward implementation strategy, which involves not splitting the trace during proof generation. 
     /// Rather, it takes a reshaped trace(num_splits times shorter and num_splits times wider)as its input, streamlining the process.
     trace.fill(
         |state| {

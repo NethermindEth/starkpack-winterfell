@@ -7,15 +7,16 @@
 <img src="https://img.shields.io/badge/verifier-rustc_1.67+-lightgray.svg">
 <a href="https://crates.io/crates/winterfell"><img src="https://img.shields.io/crates/v/winterfell"></a>
 
-A STARK prover and verifier for arbitrary computations.
+A STARKPack prover and verifier for arbitrary computations.Based on the Winterfell Library.
 
 **WARNING:** This is a research project. It has not been audited and may contain bugs and security flaws. This implementation is NOT ready for production use.
 
 ## Overview
 
-A STARK is a novel proof-of-computation scheme to create efficiently verifiable proofs of the correct execution of a computation. The scheme was developed by Eli Ben-Sasson, Michael Riabzev et al. at Technion - Israel Institute of Technology. STARKs do not require an initial trusted setup, and rely on very few cryptographic assumptions. See [references](#References) for more info.
+STARKPack and Splitting STARKs are techniques descrped in the paper TODO:add the link here.
+STARKPack makes one verifiable proof of the correct execution of a given computations instead of making one proof for each computation.This gives huge advantage in the verification time and proof sizes.
+Splitting STARKs dived the execution traces of the computation into sub traces and combines them into a single proof.This gives huge advantage in the FFT compuations which makes the prover far more effecint, also for small number of splits it gives addvatages in the verification time and proof sizes as well.
 
-The aim of this project is to build a feature-rich, easy to use, and highly performant STARK prover which can generate integrity proofs for very large computations. STARK proof generation process is massively parallelizable, however, it also requires lots of RAM. For very large computations, amount of RAM available on a single machine may not be sufficient to efficiently generate a proof. Therefore, our final goal is to efficiently distribute proof generation across many machines.
 
 ### Status and features
 
