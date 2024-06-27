@@ -38,10 +38,6 @@ Winterfell is a fully-functional, multi-threaded STARK prover and verifier with 
 
 Over time, we hope extend the library with additional features:
 
-**Distributed prover.** Distributed proof generation is the main priority of this project, and we hope to release an update containing it soon.
-
-**Perfect zero-knowledge.** The current implementation provides succinct proofs but NOT perfect zero-knowledge. This means that, in its current form, the library may not be suitable for use cases where proofs must not leak any info about secret inputs. 
-
 ### Project structure
 The project is organized into several crates like so:
 
