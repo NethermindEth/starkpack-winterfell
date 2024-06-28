@@ -47,7 +47,7 @@ where
 {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
-    /// Creates a new prover channel for the specified `air` and public inputs.
+    /// Creates a new prover channel for the specified `airs` and public inputs.
     pub fn new(
         n: usize,
         airs: &'a Vec<A>,
@@ -73,7 +73,7 @@ where
         // info sent to the verifier
         let mut coin_seed_elements: Vec<<A as Air>::BaseField> =
             contexts.first().unwrap().to_elements();
-        for mut pub_inputs_elements in pub_inputs_elements_vec.to_owned() {
+        for mut pub_inputs_elements in pub_inputs_elements_vec.iter().cloned() {
             coin_seed_elements.append(&mut pub_inputs_elements);
         }
 
@@ -115,7 +115,7 @@ where
         }
     }
 
-    /// Saves the evaluations of constraint composition polynomial columns at the out-of-domain
+    /// Saves the evaluations of final composition polynomial columns at the out-of-domain
     /// point. This also reseeds the public coin wit the hash of the evaluations.
     pub fn send_ood_constraint_evaluations(&mut self, evaluations: &[E]) {
         for ood_frame in self.ood_frames.iter_mut() {
@@ -132,6 +132,7 @@ where
     ///
     /// The elements are drawn from the public coin uniformly at random.
     pub fn get_aux_trace_segment_rand_elements(&mut self, aux_segment_idx: usize) -> Vec<E> {
+        //Here the first air is used beacause all the airs are identical
         self.airs[0]
             .get_aux_trace_segment_random_elements(aux_segment_idx, &mut self.public_coin)
             .expect("failed to draw random elements for an auxiliary trace segment")
@@ -141,10 +142,14 @@ where
     ///
     /// The coefficients are drawn from the public coin uniformly at random.
     pub fn get_constraint_composition_coeffs(&mut self) -> ConstraintCompositionCoefficients<E> {
+        //Here the first air is used beacause all the airs are identical
         self.airs[0]
             .get_constraint_composition_coefficients(&mut self.public_coin)
             .expect("failed to draw composition coefficients")
     }
+    /// Returns a coefficient for constructing the final composition polynomial.
+    ///
+    /// The coefficient is drawn from the public coin uniformly at random.
     pub fn get_final_polynomial_coeffs(&mut self) -> E {
         self.public_coin
             .draw()
@@ -159,6 +164,7 @@ where
     ///
     /// The coefficients are drawn from the public coin uniformly at random.
     pub fn get_deep_composition_coeffs(&mut self) -> DeepCompositionCoefficients<E> {
+        //Here the first air is used beacause all the airs are identical
         self.airs[0]
             .get_deep_composition_coefficients(self.airs, &mut self.public_coin)
             .expect("failed to draw DEEP composition coefficients")
@@ -169,6 +175,7 @@ where
     ///
     /// The positions are drawn from the public coin uniformly at random.
     pub fn get_query_positions(&mut self) -> Vec<usize> {
+        //Here the first air is used beacause all the airs are identical
         let num_queries = self.contexts[0].options().num_queries();
         let lde_domain_size = self.contexts[0].lde_domain_size();
         self.public_coin
@@ -180,6 +187,7 @@ where
     /// in a new seed with the number of leading zeros equal to the grinding_factor specified
     /// in the proof options.
     pub fn grind_query_seed(&mut self) {
+        //Here the first air is used beacause all the airs are identical
         let grinding_factor = self.contexts[0].options().grinding_factor();
 
         #[cfg(not(feature = "concurrent"))]

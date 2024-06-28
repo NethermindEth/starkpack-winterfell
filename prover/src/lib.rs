@@ -3,11 +3,11 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-//! This crate contains Winterfell STARK prover.
+//! This crate contains Winterfell STARKPack prover.
 //!
 //! This prover can be used to generate proofs of computational integrity using the
 //! [STARK](https://eprint.iacr.org/2018/046) (Scalable Transparent ARguments of Knowledge)
-//! protocol.
+//! protocol, and then combine them into one using STARKPack TODO: add the paper link.
 //!
 //! When the crate is compiled with `concurrent` feature enabled, proof generation will be
 //! performed in multiple threads (usually, as many threads as there are logical cores on the
@@ -105,7 +105,7 @@ pub mod tests;
 // this segment width seems to give the best performance for small fields (i.e., 64 bits)
 const DEFAULT_SEGMENT_WIDTH: usize = 8;
 
-/// Defines a STARK prover for a computation.
+/// Defines a STARKPack prover which will combine multiple STARK proofs for the computations.
 ///
 /// A STARK prover can be used to generate STARK proofs. The prover contains definitions of a
 /// computation's AIR (specified via [Air](Prover::Air) associated type), execution trace
@@ -144,7 +144,11 @@ pub trait Prover {
     /// trace.
     ///
     /// Public inputs need to be shared with the verifier in order for them to verify a proof.
-    fn get_pub_inputs(&self, trace: &Self::Trace) -> <<Self as Prover>::Air as Air>::PublicInputs;
+    fn get_pub_inputs(
+        &self,
+        trace: &Self::Trace,
+        num_splits: usize,
+    ) -> <<Self as Prover>::Air as Air>::PublicInputs;
 
     /// Returns [ProofOptions] which this prover uses to generate STARK proofs.
     ///
@@ -156,30 +160,30 @@ pub trait Prover {
     // PROVIDED METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Returns a STARK proof attesting to a correct execution of a computation defined by the
-    /// provided trace.
+    /// Returns a STARKPack proof attesting to a correct execution of the computations defined by the
+    /// provided traces.
     ///
-    /// The returned [StarkProof] attests that the specified `trace` is a valid execution trace of
-    /// the computation described by [Self::Air](Prover::Air) and generated using some set of
+    /// The returned [StarkProof] attests that the specified `traces` are the valid execution traces of
+    /// the computations described by [Self::Air](Prover::Air) and generated using some set of
     /// secret and public inputs. Public inputs must match the value returned from
-    /// [Self::get_pub_inputs()](Prover::get_pub_inputs) for the provided trace.
+    /// [Self::get_pub_inputs()](Prover::get_pub_inputs) for the provided traces.
     #[rustfmt::skip]
-    fn prove(&self, n:usize, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
+    fn prove(&self, num_splits:usize, num_traces:usize, traces: Vec<Self::Trace>) -> Result<StarkProof, ProverError> {
         // figure out which version of the generic proof generation procedure to run. this is a sort
         // of static dispatch for selecting two generic parameter: extension field and hash function.
         match self.options().field_extension() {
-            FieldExtension::None => self.generate_proof::<Self::BaseField>(n, traces),
+            FieldExtension::None => self.generate_proof::<Self::BaseField>(num_splits, num_traces, traces),
             FieldExtension::Quadratic => {
                 if !<QuadExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(2));
                 }
-                self.generate_proof::<QuadExtension<Self::BaseField>>(n, traces)
+                self.generate_proof::<QuadExtension<Self::BaseField>>(num_splits, num_traces, traces)
             }
             FieldExtension::Cubic => {
                 if !<CubeExtension<Self::BaseField>>::is_supported() {
                     return Err(ProverError::UnsupportedFieldExtension(3));
                 }
-                self.generate_proof::<CubeExtension<Self::BaseField>>(n, traces)
+                self.generate_proof::<CubeExtension<Self::BaseField>>(num_splits, num_traces, traces)
             }
         }
     }
@@ -188,37 +192,38 @@ pub trait Prover {
     // --------------------------------------------------------------------------------------------
 
     /// Performs the actual proof generation procedure, generating the proof that the provided
-    /// execution `trace` is valid against this prover's AIR.
+    /// execution `traces` are valid against this prover's AIRs.
     /// TODO: make this function un-callable externally?
     #[doc(hidden)]
     fn generate_proof<E>(
         &self,
-        n: usize,
+        num_splits: usize,
+        num_traces: usize,
         mut traces: Vec<Self::Trace>,
     ) -> Result<StarkProof, ProverError>
     where
         E: FieldElement<BaseField = Self::BaseField>,
     {
-        // 0 ----- instantiate AIR and prover channel ---------------------------------------------
+        // 0 ----- instantiate AIRs and prover channel ---------------------------------------------
 
         // serialize public inputs; these will be included in the seed for the public coin
         let pub_inputs_vec: Vec<_> = traces
             .iter()
-            .map(|trace| self.get_pub_inputs(trace))
+            .map(|trace| self.get_pub_inputs(trace, num_splits))
             .collect();
         let pub_inputs_elements_vec = pub_inputs_vec
             .iter()
             .map(|pub_inputs| pub_inputs.to_elements())
             .collect();
 
-        // create an instance of AIR for the provided parameters. this takes a generic description
-        // of the computation (provided via AIR type), and creates a description of a specific
-        // execution of the computation for the provided public inputs.
+        // create an instance of AIRs for the provided parameters. this takes a generic description
+        // of the computations (provided via AIR type), and creates a description of a specific
+        // executions of the computations for the provided public inputs.
         let airs = traces
             .iter()
             .zip(pub_inputs_vec)
             .map(|(trace, pub_inputs)| {
-                Self::Air::new(trace.get_info(), pub_inputs, self.options().clone())
+                Self::Air::new(trace.get_info(), pub_inputs, self.options().clone(), num_splits)
             })
             .collect();
 
@@ -226,14 +231,11 @@ pub trait Prover {
         // verifier; the channel will be used to commit to values and to draw randomness that
         // should come from the verifier.
         let mut channel = ProverChannel::<Self::Air, E, Self::HashFn, Self::RandomCoin>::new(
-            n,
+            num_traces,
             &airs,
             pub_inputs_elements_vec,
         );
-        //Shoulf be changed for multiple pub_inputs
-        //probably already done
-
-        // 1 ----- Commit to the execution trace --------------------------------------------------
+        // 1 ----- Commit to the execution traces --------------------------------------------------
 
         // build computation domain; this is used later for polynomial evaluations
         #[cfg(feature = "std")]
@@ -249,11 +251,6 @@ pub trait Prover {
             .iter()
             .max_by_key(|&(_, domain_lenght)| domain_lenght)
             .expect("Could not obtain the largest domain from Airs");
-        /* let (greatest_domain_index, _) = airs
-        .iter()
-        .map(|air| air.trace_length())
-        .enumerate()
-        .max_by_key(|(index, _)| index).expect("Could not obtain the largest domain from Airs"); */
         let domain = StarkDomain::new(&airs[max_domain_index]);
         #[cfg(feature = "std")]
         debug!(
@@ -262,7 +259,9 @@ pub trait Prover {
             now.elapsed().as_millis()
         );
 
-        // extend the main execution trace and build a Merkle tree from the extended trace
+        // extend the main execution traces and build a Merkle tree from the extended traces
+        //The STARKPack is not building a seperate Merkle tree for each trace
+        //but is rather combining all the tarces evaluations into one Merkle tree
         let traces_main_segment: Vec<_> = traces.iter().map(|trace| trace.main_segment()).collect();
         let (main_traces_lde, main_trace_tree, main_traces_polys) =
             self.build_trace_commitment::<Self::BaseField>(traces_main_segment, &domain);
@@ -270,19 +269,15 @@ pub trait Prover {
         // commit to the LDE of the main trace by writing the root of its Merkle tree into
         // the channel
         // ****
-        // Here we may need to commit to all the traces
-        // probably there will be some problems on how the channel sends this to the verifier
 
         //I created the clone of the main trace tree
         // manually as the #derive(Clone) didn't work
-        //let main_trace1_tree = main_trace_tree.clone();
         channel.commit_trace(*main_trace_tree.root());
         // initialize trace commitment and trace polynomial table structs with the main trace
         // data; for multi-segment traces these structs will be used as accumulators of all
         // trace segments
 
-        // For now all the traces are the same and will have the same blowup, how this changes will
-        // depend on Research solution once given
+        // For now all the traces must have the same length and by that will have the same blowup
         let blowups = main_traces_lde
             .iter()
             .map(|_| domain.trace_to_lde_blowup())
@@ -293,14 +288,16 @@ pub trait Prover {
             .map(|main_trace_polys| TracePolyTable::new(main_trace_polys.to_owned()))
             .collect();
 
-        // build auxiliary trace segments (if any), and append the resulting segments to trace
+        // build auxiliary traces segments (if any), and append the resulting segments to trace
         // commitment and trace polynomial table structs
-        let mut aux_traces_segments = Vec::with_capacity(n);
-        let mut aux_traces_rand_elements = Vec::with_capacity(n);
-        let mut rand_elements_vec = Vec::with_capacity(n);
-        let mut aux_segments = Vec::with_capacity(n);
+        //To use STARKPack all the traces should the same number of auxiliary segments
+        let mut aux_traces_segments = Vec::with_capacity(num_traces);
+        let mut aux_traces_rand_elements = Vec::with_capacity(num_traces);
+        let mut rand_elements_vec = Vec::with_capacity(num_traces);
+        let mut aux_segments = Vec::with_capacity(num_traces);
+        //Here the first tarce is used beacause all the trace layouts are identical
         for i in 0..traces[0].layout().num_aux_segments() {
-            let aux_traces_and_rand_elements: Vec<_> = traces
+            let _aux_traces_and_rand_elements: Vec<_> = traces
                 .iter_mut()
                 .map(|trace| {
                     #[cfg(feature = "std")]
@@ -328,14 +325,14 @@ pub trait Prover {
                 })
                 .collect();
 
-            // extend the auxiliary trace segment and build a Merkle tree from the extended trace
-            let aux_segments: Vec<_> = aux_segments.iter().map(|aux_segment| aux_segment).collect();
+            // extend the auxiliary traces segments and build a Merkle tree from the extended traces
+            //The STARKPack combines all the auxiliary traces into one Merkle tree
+            let aux_segments: Vec<_> = aux_segments.iter().collect();
             let (aux_segments_lde, aux_segment_tree, aux_segments_polys) =
                 self.build_trace_commitment::<E>(aux_segments.clone(), &domain);
 
-            // commit to the LDE of the extended auxiliary trace segment  by writing the root of
-            // its Merkle tree into the channel
-            //let aux_segment1_tree = aux_segment_tree.clone();
+            // commit to the LDE of the extended auxiliary traces segments by writing the root of
+            // thier Merkle tree into the channel
             channel.commit_trace(*aux_segment_tree.root());
 
             for (i, trace_polys) in traces_polys.iter().enumerate() {
@@ -351,7 +348,7 @@ pub trait Prover {
             }
         }
 
-        // make sure the specified trace (including auxiliary segments) is valid against the AIR.
+        // make sure the specified traces (including auxiliary segments) are valid against the AIRs.
         // This checks validity of both, assertions and state transitions. We do this in debug
         // mode only because this is a very expensive operation.
         #[cfg(debug_assertions)]
@@ -363,16 +360,16 @@ pub trait Prover {
                 // of the same size
                 .nth(i)
             {
-                trace.validate(&airs[i], aux_trace_segments, aux_trace_rand_elements);
+                trace.validate(&airs[i], aux_trace_segments, aux_trace_rand_elements, num_splits);
             } else {
                 let empty_col_matrix = Vec::new();
                 let empty_rand_elements = AuxTraceRandElements::<E>::new();
-                trace.validate(&airs[i], &empty_col_matrix, &empty_rand_elements);
+                trace.validate(&airs[i], &empty_col_matrix, &empty_rand_elements, num_splits);
             }
         }
 
         // 2 ----- evaluate constraints -----------------------------------------------------------
-        // evaluate constraints specified by the AIR over the constraint evaluation domain, and
+        // evaluate constraints specified by the AIRs over the constraint evaluation domain, and
         // compute random linear combinations of these evaluations using coefficients drawn from
         // the channel; this step evaluates only constraint numerators, thus, only constraints with
         // identical denominators are merged together. the results are saved into a constraint
@@ -380,36 +377,30 @@ pub trait Prover {
         // identical denominators.
         #[cfg(feature = "std")]
         let now = Instant::now();
-        //let mut constraint_coeffs_vec = Vec::new();
-        //let mut evaluator_vec = Vec::new();
         let mut constraint_evaluations_vec = Vec::new();
         for (i, air) in airs.iter().enumerate() {
             let constraint_coeffs = channel.get_constraint_composition_coeffs();
-            //constraint_coeffs_vec.push(constraint_coeffs.clone());
-            if let Some(aux_trace_rand_elements) = aux_traces_rand_elements.iter().nth(i) {
+            if let Some(aux_trace_rand_elements) = aux_traces_rand_elements.get(i) {
                 let evaluator = ConstraintEvaluator::new(
+                    num_splits,
                     air,
                     aux_trace_rand_elements.to_owned(),
                     constraint_coeffs,
                 );
-
-                //evaluator_vec.push(evaluator);
                 let constraint_evaluations =
-                    evaluator.evaluate(trace_commitment.trace_table(i), &domain);
+                    evaluator.evaluate(num_splits, trace_commitment.trace_table(i), &domain);
                 constraint_evaluations_vec.push(constraint_evaluations);
             } else {
                 let empty_rand_elements = AuxTraceRandElements::<E>::new();
                 let evaluator =
-                    ConstraintEvaluator::new(air, empty_rand_elements, constraint_coeffs);
+                    ConstraintEvaluator::new(num_splits, air, empty_rand_elements, constraint_coeffs);
 
-                //evaluator_vec.push(evaluator);
                 let constraint_evaluations =
-                    evaluator.evaluate(trace_commitment.trace_table(i), &domain);
+                    evaluator.evaluate(num_splits, trace_commitment.trace_table(i), &domain);
                 constraint_evaluations_vec.push(constraint_evaluations);
             }
         }
-
-        // We need to combine all comp polys into one final polynomial.
+        // Creates an evaluator for the final polynomial
         let final_evaluations = constraint_evaluations_vec[0].clone();
 
         #[cfg(feature = "std")]
@@ -439,6 +430,9 @@ pub trait Prover {
             trace_length_vec.push(trace_length);
             num_cols_vec.push(num_cols);
         }
+
+        // All the compsition polynomials are combined into one final compositon polynomial
+        //using a random coefficient drawn from the channel
         let mut final_comb_poly = composition_polys.first().unwrap().to_owned();
         let final_coeff = channel.get_final_polynomial_coeffs();
         let mut i: u32 = 1;
@@ -449,10 +443,8 @@ pub trait Prover {
             }
             i += 1;
             add_in_place(&mut final_comb_poly, &comb_poly);
-            //mul_acc(&mut final_comb_poly, comp_poly, final_coeff)
         }
-        //assert_eq!(trace_length, trace1_length, "Traces of different lenght");
-        //assert_eq!(num_cols, num_cols1, "Traces of different number of columns");
+        //Here the first trace_length and the num_cols are used as all the traces shuld have the same length and width
         let final_poly =
             final_evaluations.into_poly(final_comb_poly, trace_length_vec[0], num_cols_vec[0])?;
 
@@ -464,11 +456,7 @@ pub trait Prover {
             now.elapsed().as_millis()
         );
 
-        // then, build a commitment to the evaluations of the composition polynomial columns
-        //let constraint_commitment =
-        //    self.build_constraint_commitment::<E>(&composition_poly, &domain);
-        //let constraint_commitment1 =
-        //    self.build_constraint_commitment::<E>(&composition_poly1, &domain);
+        // then, build a commitment to the evaluations of the final composition polynomial columns
         let constraint_commitment = self.build_constraint_commitment::<E>(&final_poly, &domain);
         // then, commit to the evaluations of constraints by writing the root of the constraint
         // Merkle tree into the channel
@@ -485,7 +473,7 @@ pub trait Prover {
         // is drawn from, and we can potentially save on performance by only drawing this point
         // from an extension field, rather than increasing the size of the field overall.
         let z = channel.get_ood_point();
-        // evaluate trace and constraint polynomials at the OOD point z, and send the results to
+        // evaluate traces and constraint polynomials at the OOD point z, and send the results to
         // the verifier. the trace polynomials are actually evaluated over two points: z and z * g,
         // where g is the generator of the trace domain.
         let ood_traces_states: Vec<Vec<Vec<E>>> = traces_polys
@@ -494,12 +482,10 @@ pub trait Prover {
             .collect();
         let ood_trace_states_vec: Vec<&[Vec<E>]> = ood_traces_states
             .iter()
-            // .map(|ood_trace_states| &ood_trace_states[..])
             .map(|ood_trace_states| &ood_trace_states[..])
             .collect();
         channel.send_ood_trace_states(ood_trace_states_vec.clone());
 
-        //let ood_evaluations = composition_poly.evaluate_at(z);
         let ood_evaluations = final_poly.evaluate_at(z);
         channel.send_ood_constraint_evaluations(&ood_evaluations);
 
@@ -512,14 +498,12 @@ pub trait Prover {
         // combine all trace polynomials together and merge them into the DEEP composition
         // polynomial
         deep_composition_poly.add_trace_polys(traces_polys, ood_traces_states);
-        //deep_composition_poly.add_trace_polys(trace1_polys, ood_trace1_states);
-        // merge columns of constraint composition polynomial into the DEEP composition polynomial;
+        // merge columns of fianl composition polynomial into the DEEP composition polynomial;
         deep_composition_poly.add_composition_poly(final_poly, ood_evaluations);
 
         // raise the degree of the DEEP composition polynomial by one to make sure it is equal to
         // trace_length - 1
 
-        //
         // The Original winterfell removed deree adjustment
         //deep_composition_poly.adjust_degree();
 
@@ -533,8 +517,6 @@ pub trait Prover {
         // make sure the degree of the DEEP composition polynomial is equal to trace polynomial
         // degree
         assert_eq!(domain.trace_length() - 2, deep_composition_poly.degree());
-
-        //let final_poly = deep_composition_poly0 + deep_composition_poly1;
 
         // 5 ----- evaluate DEEP composition polynomial over LDE domain ---------------------------
         #[cfg(feature = "std")]
@@ -557,6 +539,7 @@ pub trait Prover {
         // 6 ----- compute FRI layers for the composition polynomial ------------------------------
         #[cfg(feature = "std")]
         let now = Instant::now();
+        //Here the first air is used beacause all the airs are identical
         let mut fri_prover = FriProver::new(airs[0].options().to_fri_options());
         fri_prover.build_layers(&mut channel, deep_evaluations);
         #[cfg(feature = "std")]
@@ -603,14 +586,14 @@ pub trait Prover {
         Ok(proof)
     }
 
-    /// Computes a low-degree extension (LDE) of the provided execution trace over the specified
-    /// domain and build a commitment to the extended trace.
+    /// Computes a low-degree extension (LDE) of the provided execution traces over the specified
+    /// domain and build a commitment to the combination of the extended traces.
     ///
-    /// The extension is performed by interpolating each column of the execution trace into a
+    /// The extension is performed by interpolating each column of the execution traces into a
     /// polynomial of degree = trace_length - 1, and then evaluating the polynomial over the LDE
     /// domain.
     ///
-    /// Trace commitment is computed by hashing each row of the extended execution trace, and then
+    /// Trace commitment is computed by hashing each row of the each extended execution trace, and then
     /// building a Merkle tree from the resulting hashes.
     fn build_trace_commitment<E>(
         &self,
@@ -624,7 +607,7 @@ pub trait Prover {
     where
         E: FieldElement<BaseField = Self::BaseField>,
     {
-        // extend the execution trace
+        // extend the execution traces
         #[cfg(feature = "std")]
         let now = Instant::now();
         let traces_polys_owned: Vec<_> = traces
@@ -633,12 +616,11 @@ pub trait Prover {
             .collect();
         let traces_polys: Vec<_> = traces_polys_owned
             .iter()
-            .map(|trace_polys| trace_polys)
             .collect();
         let traces_lde: Vec<_> = traces_polys
             .iter()
             .map(|trace_polys| {
-                RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(&trace_polys, domain)
+                RowMatrix::evaluate_polys_over::<DEFAULT_SEGMENT_WIDTH>(trace_polys, domain)
             })
             .collect();
         #[cfg(feature = "std")]
@@ -669,7 +651,7 @@ pub trait Prover {
         (traces_lde, trace_tree, traces_polys_owned)
     }
 
-    /// Evaluates constraint composition polynomial over the LDE domain and builds a commitment
+    /// Evaluates fianl composition polynomial over the LDE domain and builds a commitment
     /// to these evaluations.
     ///
     /// The evaluation is done by evaluating each composition polynomial column over the LDE

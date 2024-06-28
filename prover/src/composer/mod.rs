@@ -48,7 +48,7 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
 
     // TRACE POLYNOMIAL COMPOSITION
     // --------------------------------------------------------------------------------------------
-    /// Combines all trace polynomials into a single polynomial and saves the result into
+    /// Combines all traces polynomials into a single polynomial and saves the result into
     /// the DEEP composition polynomial. The combination is done as follows:
     ///
     /// - Compute polynomials T'_i(x) = (T_i(x) - T_i(z)) / (x - z) and
@@ -57,7 +57,8 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
     /// - Then, combine together all T'_i(x) and T''_i(x) polynomials using a random linear
     ///   combination as T(x) = sum((T'_i(x) + T''_i(x)) * cc_i) for all i, where cc_i is
     ///   the coefficient for the random linear combination drawn from the public coin.
-    ///
+    /// - Repeat this 2 steps for all the trace_polys.
+    /// - Combine all the polys into one.
     /// Note that evaluations of T_i(z) and T_i(z * g) are passed in via the `ood_trace_state`
     /// parameter.
     pub fn add_trace_polys(
@@ -65,11 +66,10 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
         traces_polys: Vec<TracePolyTable<E>>,
         ood_traces_states: Vec<Vec<Vec<E>>>,
     ) {
+        //TODO check this for the first one?
         //assert!(self.coefficients.is_empty());
         let mut trace_poly_vec = Vec::new();
-        for (index, trace_polys) in traces_polys.iter().enumerate()
-        //.zip(ood_traces_states.iter())
-        {
+        for (index, trace_polys) in traces_polys.iter().enumerate() {
             // compute a second out-of-domain point offset from z by exactly trace generator; this
             // point defines the "next" computation state in relation to point z
             let trace_length = trace_polys.poly_size();
@@ -130,20 +130,19 @@ impl<E: FieldElement> DeepCompositionPoly<E> {
             // divide the composition polynomials by (x - z) and (x - z * g), respectively,
             // and add the resulting polynomials together; the output of this step
             // is a single trace polynomial T(x) and deg(T(x)) = trace_length - 2.
-
-            //Not sure if this works
             let trace_poly = merge_trace_compositions(
                 vec![t1_composition, t2_composition],
                 vec![self.z, next_z],
             );
             trace_poly_vec.push(trace_poly);
         }
+        //Combine all the trace polys into one final polynomial.
         let first_poly = trace_poly_vec.first().unwrap().to_owned();
         let rem_polys: Vec<_> = trace_poly_vec.iter().skip(1).collect();
         let final_trace_poly = rem_polys
             .into_iter()
             .fold(first_poly, |mut acc, next_poly| {
-                add_in_place(&mut acc, &next_poly);
+                add_in_place(&mut acc, next_poly);
                 acc
             });
         // set the coefficients of the DEEP composition polynomial

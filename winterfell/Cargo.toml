@@ -19,10 +19,15 @@ bench = false
 concurrent = ["prover/concurrent", "std"]
 default = ["std"]
 std = ["prover/std", "verifier/std"]
+dhat-heap = []
 
 [dependencies]
 prover = { version = "0.6.1", path = "../prover", package = "winter-prover", default-features = false }
 verifier = { version = "0.6.1", path = "../verifier", package = "winter-verifier", default-features = false }
+dhat = "0.3.2"
+
+[profile.release]
+debug = 1
 
 # Allow math in docs
 [package.metadata.docs.rs]

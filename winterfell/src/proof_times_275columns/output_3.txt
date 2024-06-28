@@ -1,0 +1,4 @@
+Built execution Traces in 381ms
+Generated the proof in 65711ms
+Proof size: 1215.1 KB
+Proof verified in 15.6 ms

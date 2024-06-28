@@ -7,19 +7,28 @@
 <img src="https://img.shields.io/badge/verifier-rustc_1.67+-lightgray.svg">
 <a href="https://crates.io/crates/winterfell"><img src="https://img.shields.io/crates/v/winterfell"></a>
 
-A STARK prover and verifier for arbitrary computations.
+A STARKPack prover and verifier for arbitrary computations.Based on the Winterfell Library.
 
 **WARNING:** This is a research project. It has not been audited and may contain bugs and security flaws. This implementation is NOT ready for production use.
 
 ## Overview
 
-A STARK is a novel proof-of-computation scheme to create efficiently verifiable proofs of the correct execution of a computation. The scheme was developed by Eli Ben-Sasson, Michael Riabzev et al. at Technion - Israel Institute of Technology. STARKs do not require an initial trusted setup, and rely on very few cryptographic assumptions. See [references](#References) for more info.
+STARKPack and Splitting STARKs are techniques descrped in the paper * [On amortization techniques for FRI-based SNARKs](https://eprint.iacr.org/2024/661.pdf).
+STARKPack enables the generation of a single verifiable proof for the correct execution of multiple computations, instead of producing individual proofs for each computation. 
+This innovative approach significantly enhances efficiency, reducing both verification time and the proof size.
+The technique of splitting STARKs introduces a significant optimization on its own, by dividing the computation's execution traces into smaller subtraces before synthesizing them into a single, unified proof. 
+This segmentation significantly improves the efficiency of Fast Fourier Transform (FFT) calculations, leading to an improved RAM utilization and faster proof generation.
+Analysis has revealed that optimal efficiency is achieved by dividing the traces into segments of 2, 4, or 8. Such configurations not only minimize proving time but also the verification time and the proof size.
+Opting for larger divisions accelerates the proving process further but at the cost of increased verification time and larger proofs.
+STARKPack and Splitting STARKs offer remarkable flexibility, designed to work both separately and together, allowing for tailored optimization of cryptographic proofs. 
+This dual-functionality approach enables efficient management of proving and verification times, proof sizes, and RAM utilization. 
 
-The aim of this project is to build a feature-rich, easy to use, and highly performant STARK prover which can generate integrity proofs for very large computations. STARK proof generation process is massively parallelizable, however, it also requires lots of RAM. For very large computations, amount of RAM available on a single machine may not be sufficient to efficiently generate a proof. Therefore, our final goal is to efficiently distribute proof generation across many machines.
+Note:
+The WIntefell's design makes it's more efficient to implement the spliting technique by not dividing the execution trace but rather by reshapening it into shorter and wider trace
 
 ### Status and features
 
-Winterfell is a fully-functional, multi-threaded STARK prover and verifier with the following nice properties:
+STARKPack-Winterfell is a fully-functional, multi-threaded STARKPack prover and verifier with the following nice properties:
 
 **A simple interface.** The library provides a relatively simple interface for describing general computations. See [usage](#Usage) for a quick tutorial, [air crate](air) for the description of the interface, and [examples crate](examples) for a few real-world examples.
 
@@ -29,7 +38,7 @@ Winterfell is a fully-functional, multi-threaded STARK prover and verifier with 
 
 **Configurable fields.** Both the base and the extension field for proof generation can be chosen dynamically. This simplifies fine-tuning of proof generation for specific performance and security targets. See [math crate](math) for description of currently available fields.
 
-**Configurable hash functions.** The library allows dynamic selection of hash functions used in the STARK protocol. Currently, BLAKE3 and SHA3 hash functions are supported, and support for arithmetization-friendly hash function (e.g. Rescue) is planned.
+**Configurable hash functions.** The library allows dynamic selection of hash functions used in the STARK protocol. Currently, BLAKE3,Resque and SHA3 hash functions are supported, and support for arithmetization-friendly hash function (e.g. Rescue) is planned.
 
 **WebAssembly support.** The library is written in pure Rust and can be compiled to WebAssembly. The `std` standard library is enabled as feature by default for both prover and verifier crates. For WASM targets, one can compile with default features disabled by using `--no-default-features` flag.
 
@@ -37,31 +46,23 @@ Winterfell is a fully-functional, multi-threaded STARK prover and verifier with 
 
 Over time, we hope extend the library with additional features:
 
-**Distributed prover.** Distributed proof generation is the main priority of this project, and we hope to release an update containing it soon.
-
-**Perfect zero-knowledge.** The current implementation provides succinct proofs but NOT perfect zero-knowledge. This means that, in its current form, the library may not be suitable for use cases where proofs must not leak any info about secret inputs. 
-
 ### Project structure
 The project is organized into several crates like so:
 
-| Crate                | Description |
-| -------------------- | ----------- |
-| [examples](examples) | Contains examples of generating/verifying proofs for several toy and real-world computations. |
-| [prover](prover)     | Contains an implementation of a STARK prover which can be used to generate computational integrity proofs. |
-| [verifier](verifier) | Contains an implementation of a STARK verifier which can verify proofs generated by the Winterfell prover. |
-| [winterfell](winterfell) | Re-exports prover and verifier crates as a single create for simplified dependency management. |
-| [air](air)           | Contains components needed to describe arbitrary computations in a STARK-specific format. |
-| [fri](fri)           | Contains implementation of a FRI prover and verifier. These are used internally by the STARK prover and verifier. |
-| [math](math)         | Contains modules with math operations needed in STARK proof generation/verification. These include: finite field arithmetic, polynomial arithmetic, and FFTs. |
-| [crypto](crypto)     | Contains modules with cryptographic operations needed in STARK proof generation/verification. Specifically: hash functions and Merkle trees. |
-| [utils](utils)       | Contains a set of utility traits, functions, and macros used throughout the library. |
+| Crate                    | Description                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [examples](examples)     | Contains examples of generating/verifying proofs for several toy and real-world computations.                                                                 |
+| [prover](prover)         | Contains an implementation of a STARKPack prover which can be used to generate computational integrity proofs.                                                |
+| [verifier](verifier)     | Contains an implementation of a STARKPack verifier which can verify proofs generated by the Winterfell prover.                                                |
+| [winterfell](winterfell) | Re-exports prover and verifier crates as a single create for simplified dependency management.                                                                |
+| [air](air)               | Contains components needed to describe arbitrary computations in a STARK-specific format.                                                                     |
+| [fri](fri)               | Contains implementation of a FRI prover and verifier. These are used internally by the STARK prover and verifier.                                             |
+| [math](math)             | Contains modules with math operations needed in STARK proof generation/verification. These include: finite field arithmetic, polynomial arithmetic, and FFTs. |
+| [crypto](crypto)         | Contains modules with cryptographic operations needed in STARK proof generation/verification. Specifically: hash functions and Merkle trees.                  |
+| [utils](utils)           | Contains a set of utility traits, functions, and macros used throughout the library.                                                                          |
 
 ## Usage
-Generating STARK proofs for a computation is a relatively complicated process. This library aims to abstract away most of the complexity, however, the users are still expected to provide descriptions of their computations in a STARK-specific format. This format is called *algebraic intermediate representation*, or AIR, for short.
-
-This library contains several higher-level constructs which make defining AIRs for computations a little easier, and there are also examples of AIRs for several computations available in the [examples crate](examples). However, the best way to understand the STARK proof generation process is to go through a trivial example from start to finish.
-
-First, we'll need to pick a computation for which we'll be generating and verifying STARK proofs. To keep things simple, we'll use the following:
+First, we'll need to pick computations for which we'll be generating and verifying STARKPack and/or Folding-STARKs proofs. To keep things simple, we'll use the following:
 
 ```Rust
 use winterfell::math::{fields::f128::BaseElement, FieldElement};
@@ -81,14 +82,14 @@ Suppose, we run this computation for a million steps and get some result. Using 
 
 First, we need to define an *execution trace* for our computation. This trace should capture the state of the computation at every step of its execution. In our case, the trace is just a single column of intermediate values after each execution of the loop. For example, if we start with value `3` and run the computation for 1,048,576 (same as 2<sup>20</sup>) steps, the execution trace will look like this:
 
-| Step      | State  |
-| :-------: | :----- |
-| 0         | 3      |
-| 1         | 69     |
-| 2         | 328551 |
-| 3         | 35465687262668193 |
-| 4         | 237280320818395402166933071684267763523 |
-| ...       |
+|   Step    | State                                   |
+| :-------: | :-------------------------------------- |
+|     0     | 3                                       |
+|     1     | 69                                      |
+|     2     | 328551                                  |
+|     3     | 35465687262668193                       |
+|     4     | 237280320818395402166933071684267763523 |
+|    ...    |
 | 1,048,575 | 247770943907079986105389697876176586605 |
 
 To record the trace, we'll use the `TraceTable` struct provided by the library. The function below, is just a modified version of the `do_work()` function which records every intermediate state of the computation in the `TraceTable` struct:
@@ -117,6 +118,39 @@ pub fn build_do_work_trace(start: BaseElement, n: usize) -> TraceTable<BaseEleme
         },
     );
 
+    trace
+}
+```
+In the STARKPack paper, the splitting technique is described as dividing the execution trace into num_splits subtraces։
+However, this approach is challenging and less efficient for Winterfell's framework.
+Instead, We adopt a more straightforward implementation strategy, which involves not splitting the trace during proof generation. 
+Rather, it takes a reshaped trace(num_splits times shorter and num_splits times wider)as its input, streamlining the process.
+```Rust
+pub fn build_do_work_trace(start: BaseElement, n: usize, num_splits: usize) -> TraceTable<BaseElement> {
+    // Instantiate the trace num_splits times shorter and num_splits times wider; this will allocate all
+    // required memory for the trace
+    let trace_width: usize = NUM_COLS * num_splits;
+    let mut trace = TraceTable::new(trace_width, n / num_splits);
+
+    // Fill the reshaped trace with data; the first closure initializes the first state of the
+    // computation; the second closure computes the next state of the computation based
+    // on its current state.
+    trace.fill(
+        |state| {
+            state[0] = start;
+            for idx in 1..num_splits {
+                state[NUM_COLS * idx] =
+                    state[NUM_COLS * (idx - 1)].exp(3u32.into()) + BaseElement::new(42);
+            }
+        },
+        |_, state| {
+            state[0] = state[NUM_COLS * (num_splits - 1)].exp(3u32.into()) + BaseElement::new(42);
+            for idx in 1..num_splits {
+                state[NUM_COLS * idx] =
+                    state[NUM_COLS * (idx - 1)].exp(3u32.into()) + BaseElement::new(42);
+            }
+        },
+    );
     trace
 }
 ```
@@ -158,33 +192,35 @@ pub struct WorkAir {
     result: BaseElement,
 }
 
+```Rust
 impl Air for WorkAir {
-    // First, we'll specify which finite field to use for our computation, and also how
+    // First, we'll specify which finite field to use for our computations, and also how
     // the public inputs must look like.
     type BaseField = BaseElement;
     type PublicInputs = PublicInputs;
 
-    // Here, we'll construct a new instance of our computation which is defined by 3 parameters:
-    // starting value, number of steps, and the end result. Another way to think about it is
+    // Here, we'll construct a new instance of our computations which are defined by 3 parameters:
+    // starting values, number of steps(number of steps must be equal for all the computations), 
+    // and the end results. Another way to think about it is
     // that an instance of our computation is a specific invocation of the do_work() function.
-    fn new(trace_info: TraceInfo, pub_inputs: PublicInputs, options: ProofOptions) -> Self {
-        // our execution trace should have only one column.
-        assert_eq!(1, trace_info.width());
+    fn new(
+        trace_info: TraceInfo,
+        pub_inputs: PublicInputs,
+        options: ProofOptions,
+        num_splits: usize,
+    ) -> Self {
+        // our execution trace should be num_splits times wider.
+        assert_eq!(NUM_COLS * num_splits, trace_info.width());
 
         // Our computation requires a single transition constraint. The constraint itself
         // is defined in the evaluate_transition() method below, but here we need to specify
         // the expected degree of the constraint. If the expected and actual degrees of the
         // constraints don't match, an error will be thrown in the debug mode, but in release
         // mode, an invalid proof will be generated which will not be accepted by any verifier.
-        let degrees = vec![TransitionConstraintDegree::new(3)];
-
-        // We also need to specify the exact number of assertions we will place against the
-        // execution trace. This number must be the same as the number of items in a vector
-        // returned from the get_assertions() method below.
-        let num_assertions = 2;
+        let degrees = vec![TransitionConstraintDegree::new(3); num_splits];
 
         WorkAir {
-            context: AirContext::new(trace_info, degrees, num_assertions, options),
+            context: AirContext::new(trace_info, degrees, 2, options),
             start: pub_inputs.start,
             result: pub_inputs.result,
         }
@@ -196,32 +232,48 @@ impl Air for WorkAir {
     // value. The `frame` parameter will contain current and next states of the computation.
     fn evaluate_transition<E: FieldElement + From<Self::BaseField>>(
         &self,
+        num_splits: usize,
         frame: &EvaluationFrame<E>,
         _periodic_values: &[E],
         result: &mut [E],
     ) {
         // First, we'll read the current state, and use it to compute the expected next state
-        let current_state = &frame.current()[0];
-        let next_state = current_state.exp(3u32.into()) + E::from(42u32);
+        let current = &frame.current();
+        let next = &frame.next();
 
-        // Then, we'll subtract the expected next state from the actual next state; this will
-        // evaluate to zero if and only if the expected and actual states are the same.
-        result[0] = frame.next()[0] - next_state;
+        //!  STARK                                                                        Splitting STARKs (mod 2)  
+        //! | Step      | State  |                                                       | Step      | State0 | State1 |
+        //! | :-------: | :----- |                                                       | :-------: | :----- | :----- |
+        //! | 0         | 3      |                                                       | 0         | 3      | 69     |
+        //! | 1         | 69     |                                                       | 1         | 328551 | 35465687262668193 |
+        //! | 2         | 328551 |                                                       | 2         | 237280320818395402166933071684267763523 | ... |
+        //! | 3         | 35465687262668193 |                                            |...        |
+        //! | 4         | 237280320818395402166933071684267763523 |                      | 524,288   | ...    | 247770943907079986105389697876176586605 |
+        //! | ...       |
+        //! | 1,048,575 | 247770943907079986105389697876176586605 |  
+
+        // Here we can see the difference between STARK and and Spliting STARKs.
+        // In the STARKs the the transition constraint is between the State[i] and State[i+1], while
+        // in the Spliting STARKs the the transition constraint is between the State0[i] and State1[i], and State0[i+1] and State1[i]
+        for idx in 0..num_splits - 1 {
+            result[idx] = current[NUM_COLS * idx].exp(3u32.into()) + E::from(42u32)
+                - current[NUM_COLS * (idx + 1)];
+        }
+        result[num_splits - 1] = current[NUM_COLS * (num_splits - 1)].exp(3u32.into()) + E::from(42u32) - next[0];
     }
 
     // Here, we'll define a set of assertions about the execution trace which must be satisfied
     // for the computation to be valid. Essentially, this ties computation's execution trace
     // to the public inputs.
-    fn get_assertions(&self) -> Vec<Assertion<Self::BaseField>> {
+    fn get_assertions(&self, num_splits: usize) -> Vec<Assertion<Self::BaseField>> {
         // for our computation to be valid, value in column 0 at step 0 must be equal to the
         // starting value, and at the last step it must be equal to the result.
         let last_step = self.trace_length() - 1;
         vec![
             Assertion::single(0, 0, self.start),
-            Assertion::single(0, last_step, self.result),
+            Assertion::single(NUM_COLS * (num_splits - 1), last_step, self.result),
         ]
     }
-
     // This is just boilerplate which is used by the Winterfell prover/verifier to retrieve
     // the context of the computation.
     fn context(&self) -> &AirContext<Self::BaseField> {
@@ -260,12 +312,12 @@ impl Prover for WorkProver {
     type Trace = TraceTable<Self::BaseField>;
     type HashFn = Blake3_256<Self::BaseField>;
 
-    // Our public inputs consist of the first and last value in the execution trace.
-    fn get_pub_inputs(&self, trace: &Self::Trace) -> PublicInputs {
+   // Our public inputs consist of the first and last value in the execution trace.
+    fn get_pub_inputs(&self, trace: &Self::Trace, num_splits: usize) -> PublicInputs {
         let last_step = trace.length() - 1;
         PublicInputs {
             start: trace.get(0, 0),
-            result: trace.get(0, last_step),
+            result: trace.get(NUM_COLS * (num_splits - 1), last_step),
         }
     }
 
@@ -275,7 +327,7 @@ impl Prover for WorkProver {
 }
 ```
 
-Now, we are finally ready to generate a STARK proof. The function below, will execute our computation, and will return the result together with the proof that the computation was executed correctly.
+Now, we are finally ready to generate a STARKPack proof. The function below, will execute our computations, and will return the result together with the proof that the computations were executed correctly.
 
 ```Rust
 use winterfell::{
@@ -284,14 +336,6 @@ use winterfell::{
 };
 
 pub fn prove_work() -> (BaseElement, StarkProof) {
-    // We'll just hard-code the parameters here for this example.
-    let start = BaseElement::new(3);
-    let n = 1_048_576;
-
-    // Build the execution trace and get the result from the last step.
-    let trace = build_do_work_trace(start, n);
-    let result = trace.get(0, n - 1);
-
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(
         32, // number of queries
@@ -307,19 +351,57 @@ pub fn prove_work() -> (BaseElement, StarkProof) {
     let proof = prover.prove(trace).unwrap();
 
     (result, proof)
+    let starting_vec: Vec<_> = (0..1_u128.pow(2)).map(|i| BaseElement::new(i)).collect();
+    let n = 2_usize.pow(16);
+    // The number of traces to be compined by STARKPack.
+    let num_traces = starting_vec.len();
+    // The number of splits od each trace.
+    let num_splits = 2_usize.pow(6);
+    // Build the execution trace and get the result from the last step.
+    let mut traces= Vec::new();
+    traces.push(build_do_work_trace(starting_vec[0], n, num_splits));
+    traces.push(build_do_work_trace(starting_vec[1], n, num_splits));
+    let results: Vec<_> = traces
+        .iter()
+        .map(|trace| trace.get(NUM_COLS * (num_splits - 1), n / num_splits - 1))
+        .collect();
+    // Define proof options; these will be enough for ~96-bit security level.
+    let options = ProofOptions::new(
+        32, // number of queries
+        8,  // blowup factor
+        0,  // grinding factor
+        FieldExtension::None,
+        8,  // FRI folding factor
+        31, // FRI max remainder polynomial degree
+    );
+    // Instantiate the prover and generate the proof.
+    let prover = WorkProver::new(options);
+    let proof = prover.prove(num_splits, num_traces, traces).unwrap();
 }
 ```
 
 We can then give this proof (together with the public inputs) to anyone, and they can verify that we did in fact execute the computation and got the claimed result. They can do this like so:
 
 ```Rust
-pub fn verify_work(start: BaseElement, result: BaseElement, proof: StarkProof) {
-    // The number of steps and options are encoded in the proof itself, so we
-    // don't need to pass them explicitly to the verifier.
-    let pub_inputs = PublicInputs { start, result };
-    match winterfell::verify::<WorkAir, Blake3_256<Self::BaseField>>(proof, pub_inputs) {
-        Ok(_) => println!("yay! all good!"),
-        Err(_) => panic!("something went terribly wrong!"),
+let pub_inputs_vec = starting_vec
+        .into_iter()
+        .zip(results)
+        .map(|(start, result)| PublicInputs { start, result })
+        .collect();
+
+match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
+    proof,
+    pub_inputs_vec,
+    num_splits,
+) {
+    Ok(_) => {
+        println!(
+            "Proof verified in {:.1} ms",
+            now.elapsed().as_micros() as f64 / 1000f64
+        );
+    }
+    Err(err) => {
+        println!("Proof is not valid\nErr: {}", err);
     }
 }
 ```
@@ -415,11 +497,11 @@ Let's benchmark another example. This time our computation will consist of verif
 
 | # of signatures | Trace time | Proving time | Prover RAM | Proof size | Verifier time |
 | --------------- | :--------: | :----------: | :--------: | :--------: | :-----------: |
-| 64              | 0.2 sec    | 1.2 sec      | 0.5 GB     | 110 KB     | 4.4 ms        |
-| 128             | 0.4 sec    | 2.6 sec      | 1.0 GB     | 121 KB     | 4.4 ms        |
-| 256             | 0.8 sec    | 5.3 sec      | 1.9 GB     | 132 KB     | 4.5 ms        |
-| 512             | 1.6 sec    | 10.9 sec     | 3.8 GB     | 139 KB     | 4.9 ms        |
-| 1024            | 3.2 sec    | 20.5 sec     | 7.6 GB     | 152 KB     | 5.9 ms        |
+| 64              |  0.2 sec   |   1.2 sec    |   0.5 GB   |   110 KB   |    4.4 ms     |
+| 128             |  0.4 sec   |   2.6 sec    |   1.0 GB   |   121 KB   |    4.4 ms     |
+| 256             |  0.8 sec   |   5.3 sec    |   1.9 GB   |   132 KB   |    4.5 ms     |
+| 512             |  1.6 sec   |   10.9 sec   |   3.8 GB   |   139 KB   |    4.9 ms     |
+| 1024            |  3.2 sec   |   20.5 sec   |   7.6 GB   |   152 KB   |    5.9 ms     |
 
 A few observations about these benchmarks:
 * Trace time and prover RAM (RAM consumed by the prover during proof generation) grow pretty much linearly with the size of the computation.
@@ -428,15 +510,15 @@ A few observations about these benchmarks:
 
 Another difference between this example and Rescue hash chain is that we can generate execution trace for each signature verification independently, and thus, we can build the entire trace in parallel using multiple threads. In general, Winterfell prover performance scales nearly linearly with every additional CPU core. This is because nearly all steps of STARK proof generation process can be parallelized. The table below illustrates this relationship on the example of verifying 1024 Lamport+ signatures (at 123-bit security level). This time, our benchmark machine is AMD EPYC 7003 with 64 CPU cores.
 
-| Threads | Trace time  | Proving time | Total time (trace + proving) | Improvement |
-| ------- | :---------: | :----------: | :--------------------------: | :---------: |
-| 1       | 28 sec      | 127 sec      | 155 sec                      |  1x         |
-| 2       | 14 sec      | 64 sec       | 78 sec                       |  2x         |
-| 4       | 6.7 sec     | 33 sec       | 39.7 sec                     |  3.9x       |
-| 8       | 3.8 sec     | 17 sec       | 20.8 sec                     |  7.5x       |
-| 16      | 2 sec       | 10.3 sec     | 12.3 sec                     |  12.6x      |
-| 32      | 1 sec       | 6 sec        | 7 sec                        |  22.1x      |
-| 64      | 0.6 sec     | 3.8 sec      | 4.4 sec                      |  35.2x      |
+| Threads | Trace time | Proving time | Total time (trace + proving) | Improvement |
+| ------- | :--------: | :----------: | :--------------------------: | :---------: |
+| 1       |   28 sec   |   127 sec    |           155 sec            |     1x      |
+| 2       |   14 sec   |    64 sec    |            78 sec            |     2x      |
+| 4       |  6.7 sec   |    33 sec    |           39.7 sec           |    3.9x     |
+| 8       |  3.8 sec   |    17 sec    |           20.8 sec           |    7.5x     |
+| 16      |   2 sec    |   10.3 sec   |           12.3 sec           |    12.6x    |
+| 32      |   1 sec    |    6 sec     |            7 sec             |    22.1x    |
+| 64      |  0.6 sec   |   3.8 sec    |           4.4 sec            |    35.2x    |
 
 
 ## References
@@ -468,4 +550,5 @@ This project is [MIT licensed](./LICENSE).
 Acknowledgements
 -------
 
-The original codebase was developed by Irakliy Khaburzaniya ([@irakliyk](https://github.com/irakliyk)) with contributions from François Garillot ([@huitseeker](https://github.com/huitseeker)), Kevin Lewi ([@kevinlewi](https://github.com/kevinlewi)), Konstantinos Chalkias ([@kchalkias](https://github.com/kchalkias)), and Jasleen Malvai ([@Jasleen1](https://github.com/Jasleen1)).
+This codebase is developed by Nethermind and YSU crytography research groups.
+And is based on the winterfell library.

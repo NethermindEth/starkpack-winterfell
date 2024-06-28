@@ -201,7 +201,15 @@ impl<E: FieldElement> RowMatrix<E> {
         // build Merkle tree out of hashed rows
         MerkleTree::new(row_hashes).expect("failed to construct trace Merkle tree")
     }
-    pub fn commit_to_comb_rows<H>(&self, traces_lde: &Vec<RowMatrix<E>>) -> MerkleTree<H>
+    /// Returns a commitment to this vector of matrixes.
+    ///
+    /// The commitment is built as follows:
+    /// * Each row of all the matrixes are concateneted into one and then hashed into a single digest of the specified hash function.
+    /// * The resulting values are used to build a binary Merkle tree such that each concateneted row digest
+    ///   becomes a leaf in the tree. Thus, the number of leaves in the tree is equal to the
+    ///   number of rows in the first matrix(all the matrixes must have the same length).
+    /// * The resulting Merkle tree is returned as the commitment to the entire vector of matrixes.
+    pub fn commit_to_comb_rows<H>(&self, traces_lde: &[RowMatrix<E>]) -> MerkleTree<H>
     where
         H: ElementHasher<BaseField = E::BaseField>,
     {
@@ -224,9 +232,7 @@ impl<E: FieldElement> RowMatrix<E> {
                     let mut comb_rows = trace_row.to_vec();
                     for next_trace_row in traces_row {
                         let next_trace_row_vec = next_trace_row.to_vec();
-                        // comb_rows.extend_from_slice(next_trace_row);
                         comb_rows = [comb_rows.to_owned(), next_trace_row_vec].concat();
-                        // TODO^: Check if is best to concat or creating a vector
                     }
                     *row_hash = H::hash_elements(&comb_rows);
                 }

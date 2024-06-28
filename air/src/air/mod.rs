@@ -193,7 +193,13 @@ pub trait Air: Send + Sync {
     /// - `public_inputs` specifies public inputs for this instance of the computation.
     /// - `options` defines proof generation options such as blowup factor, hash function etc.
     ///   these options define security level of the proof and influence proof generation time.
-    fn new(trace_info: TraceInfo, pub_inputs: Self::PublicInputs, options: ProofOptions) -> Self;
+    /// - `num_splits` specifies exactly how many segments the execution trace should be divided into. Originally, STARK uses a value of one.
+    fn new(
+        trace_info: TraceInfo,
+        pub_inputs: Self::PublicInputs,
+        options: ProofOptions,
+        num_splits: usize,
+    ) -> Self;
 
     /// Returns context for this instance of the computation.
     fn context(&self) -> &AirContext<Self::BaseField>;
@@ -210,13 +216,14 @@ pub trait Air: Send + Sync {
     /// (when extension fields are used).
     fn evaluate_transition<E: FieldElement<BaseField = Self::BaseField>>(
         &self,
+        num_splits: usize,
         frame: &EvaluationFrame<E>,
         periodic_values: &[E],
         result: &mut [E],
     );
 
     /// Returns a set of assertions against a concrete execution trace of this computation.
-    fn get_assertions(&self) -> Vec<Assertion<Self::BaseField>>;
+    fn get_assertions(&self, num_splits: usize) -> Vec<Assertion<Self::BaseField>>;
 
     // AUXILIARY TRACE CONSTRAINTS
     // --------------------------------------------------------------------------------------------
@@ -356,12 +363,13 @@ pub trait Air: Send + Sync {
     /// combination of boundary constraints during constraint merging.
     fn get_boundary_constraints<E: FieldElement<BaseField = Self::BaseField>>(
         &self,
+        num_splits: usize,
         aux_rand_elements: &AuxTraceRandElements<E>,
         composition_coefficients: &[E],
     ) -> BoundaryConstraints<E> {
         BoundaryConstraints::new(
             self.context(),
-            self.get_assertions(),
+            self.get_assertions(num_splits),
             self.get_aux_assertions(aux_rand_elements),
             composition_coefficients,
         )
@@ -520,7 +528,7 @@ pub trait Air: Send + Sync {
     /// composition polynomial.
     fn get_deep_composition_coefficients<A: Air, E, R>(
         &self,
-        airs: &Vec<A>,
+        airs: &[A],
         public_coin: &mut R,
     ) -> Result<DeepCompositionCoefficients<E>, RandomCoinError>
     where

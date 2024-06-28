@@ -160,9 +160,12 @@ impl<'a, E: FieldElement> ConstraintEvaluationTable<'a, E> {
     /// `num_cols` is the number of necessary columns (of length `trace_length`) needed to store
     /// the coefficients of the constraint composition polynomial and is needed by
     /// `CompositionPoly::new`.
-    /// ****
-    /// The function into_poly() is exchanged with 2 functions where into_comb_poly() returns
-    /// the composition polynomial as vector and into_poly() returns as a matrix.
+
+    /// The functions into_comb_poly() and into_poly() wotk in tandem.
+    /// Initially, into_comb_poly() generates the composition polynomials in vector form. 
+    /// Once these vectors are combined into the final polynomial, 
+    /// into_poly() then transforms this final polynomial into matrix form.
+
     pub fn into_comb_poly(self, num_cols: usize) -> (Vec<E>, usize, usize) {
         // allocate memory for the combined polynomial
         let mut combined_poly = E::zeroed_vector(self.num_rows());
@@ -181,7 +184,6 @@ impl<'a, E: FieldElement> ConstraintEvaluationTable<'a, E> {
         fft::interpolate_poly_with_offset(&mut combined_poly, &inv_twiddles, self.domain.offset());
 
         let trace_length = self.domain.trace_length();
-        //Ok(CompositionPoly::new(combined_poly, trace_length, num_cols))
         (combined_poly, trace_length, num_cols)
     }
 

@@ -33,8 +33,8 @@ pub struct TraceInfo {
 impl TraceInfo {
     /// Smallest allowed execution trace length; currently set at 8.
     pub const MIN_TRACE_LENGTH: usize = 8;
-    /// Maximum number of columns in an execution trace (across all segments); currently set at 255.
-    pub const MAX_TRACE_WIDTH: usize = 255;
+    /// Maximum number of columns in all the execution traces combined (across all segments and all traces); currently set at 255*300.
+    pub const MAX_TRACE_WIDTH: usize = 255 * 300;
     /// Maximum number of bytes in trace metadata; currently set at 65535.
     pub const MAX_META_LENGTH: usize = 65535;
     /// Maximum number of random elements per auxiliary trace segment; currently set to 255.
