@@ -21,7 +21,7 @@ fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
     let starting_vec: Vec<_> = (0..1_u128.pow(2)).map(|i| BaseElement::new(i)).collect();
-    let m = 2_usize.pow(16);
+    let n = 2_usize.pow(16);
     let num_traces = starting_vec.len();
     println!("{}", num_traces);
     let num_splits = 2_usize.pow(6);
@@ -29,15 +29,15 @@ fn main() {
     let now: Instant = Instant::now();
     // let traces: Vec<_> = starting_vec
     //     .iter()
-    //     .map(|&start| build_do_work_trace(start, m, num_splits))
+    //     .map(|&start| build_do_work_trace(start, n, num_splits))
     //     .collect();
     // println!("Built execution Traces in {}ms", now.elapsed().as_millis());
     let mut traces= Vec::new();
-    traces.push(build_do_work_trace(starting_vec[0], m, num_splits));
-    traces.push(build_do_work_trace(starting_vec[1], m, num_splits));
+    traces.push(build_do_work_trace(starting_vec[0], n, num_splits));
+    traces.push(build_do_work_trace(starting_vec[1], n, num_splits));
     let results: Vec<_> = traces
         .iter()
-        .map(|trace| trace.get(NUM_COLS * (num_splits - 1), m / num_splits - 1))
+        .map(|trace| trace.get(NUM_COLS * (num_splits - 1), n / num_splits - 1))
         .collect();
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(

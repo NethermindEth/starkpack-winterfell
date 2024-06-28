@@ -266,13 +266,14 @@ impl Air for WorkAir {
 
 ```Rust
 impl Air for WorkAir {
-    // First, we'll specify which finite field to use for our computation, and also how
+    // First, we'll specify which finite field to use for our computations, and also how
     // the public inputs must look like.
     type BaseField = BaseElement;
     type PublicInputs = PublicInputs;
 
-    // Here, we'll construct a new instance of our computation which is defined by 3 parameters:
-    // starting value, number of steps, and the end result. Another way to think about it is
+    // Here, we'll construct a new instance of our computations which are defined by 3 parameters:
+    // starting values, number of steps(number of steps must be equal for all the computations), 
+    // and the end results. Another way to think about it is
     // that an instance of our computation is a specific invocation of the do_work() function.
     fn new(
         trace_info: TraceInfo,
@@ -280,10 +281,10 @@ impl Air for WorkAir {
         options: ProofOptions,
         num_splits: usize,
     ) -> Self {
-        // our execution trace should have only one column.
+        // our execution trace should be num_splits times wider.
         assert_eq!(NUM_COLS * num_splits, trace_info.width());
 
-         // Our computation requires a single transition constraint. The constraint itself
+        // Our computation requires a single transition constraint. The constraint itself
         // is defined in the evaluate_transition() method below, but here we need to specify
         // the expected degree of the constraint. If the expected and actual degrees of the
         // constraints don't match, an error will be thrown in the debug mode, but in release
@@ -312,8 +313,20 @@ impl Air for WorkAir {
         let current = &frame.current();
         let next = &frame.next();
 
-        // Then, we'll subtract the expected next state from the actual next state; this will
-        // evaluate to zero if and only if the expected and actual states are the same.
+        //!  STARK                                                                        Splitting STARKs (mod 2)  
+        //! | Step      | State  |                                                       | Step      | State0 | State1 |
+        //! | :-------: | :----- |                                                       | :-------: | :----- | :----- |
+        //! | 0         | 3      |                                                       | 0         | 3      | 69     |
+        //! | 1         | 69     |                                                       | 1         | 328551 | 35465687262668193 |
+        //! | 2         | 328551 |                                                       | 2         | 237280320818395402166933071684267763523 | ... |
+        //! | 3         | 35465687262668193 |                                            |...        |
+        //! | 4         | 237280320818395402166933071684267763523 |                      | 524,288   | ...    | 247770943907079986105389697876176586605 |
+        //! | ...       |
+        //! | 1,048,575 | 247770943907079986105389697876176586605 |  
+
+        // Here we can see the difference between STARK and and Spliting STARKs.
+        // In the STARKs the the transition constraint is between the State[i] and State[i+1], while
+        // in the Spliting STARKs the the transition constraint is between the State0[i] and State0[i+1], and State0[i+1] and State1[i]
         for idx in 0..num_splits - 1 {
             result[idx] = current[NUM_COLS * idx].exp(3u32.into()) + E::from(42u32)
                 - current[NUM_COLS * (idx + 1)];
@@ -371,12 +384,12 @@ impl Prover for WorkProver {
     type Trace = TraceTable<Self::BaseField>;
     type HashFn = Blake3_256<Self::BaseField>;
 
-    // Our public inputs consist of the first and last value in the execution trace.
-    fn get_pub_inputs(&self, trace: &Self::Trace) -> PublicInputs {
+   // Our public inputs consist of the first and last value in the execution trace.
+    fn get_pub_inputs(&self, trace: &Self::Trace, num_splits: usize) -> PublicInputs {
         let last_step = trace.length() - 1;
         PublicInputs {
             start: trace.get(0, 0),
-            result: trace.get(0, last_step),
+            result: trace.get(NUM_COLS * (num_splits - 1), last_step),
         }
     }
 
@@ -386,7 +399,7 @@ impl Prover for WorkProver {
 }
 ```
 
-Now, we are finally ready to generate a STARK proof. The function below, will execute our computation, and will return the result together with the proof that the computation was executed correctly.
+Now, we are finally ready to generate a STARKPack proof. The function below, will execute our computations, and will return the result together with the proof that the computations were executed correctly.
 
 ```Rust
 use winterfell::{
@@ -395,14 +408,6 @@ use winterfell::{
 };
 
 pub fn prove_work() -> (BaseElement, StarkProof) {
-    // We'll just hard-code the parameters here for this example.
-    let start = BaseElement::new(3);
-    let n = 1_048_576;
-
-    // Build the execution trace and get the result from the last step.
-    let trace = build_do_work_trace(start, n);
-    let result = trace.get(0, n - 1);
-
     // Define proof options; these will be enough for ~96-bit security level.
     let options = ProofOptions::new(
         32, // number of queries
@@ -418,19 +423,57 @@ pub fn prove_work() -> (BaseElement, StarkProof) {
     let proof = prover.prove(trace).unwrap();
 
     (result, proof)
+    let starting_vec: Vec<_> = (0..1_u128.pow(2)).map(|i| BaseElement::new(i)).collect();
+    let n = 2_usize.pow(16);
+    // The number of traces to be compined by STARKPack.
+    let num_traces = starting_vec.len();
+    // The number of splits od each trace.
+    let num_splits = 2_usize.pow(6);
+    // Build the execution trace and get the result from the last step.
+    let mut traces= Vec::new();
+    traces.push(build_do_work_trace(starting_vec[0], n, num_splits));
+    traces.push(build_do_work_trace(starting_vec[1], n, num_splits));
+    let results: Vec<_> = traces
+        .iter()
+        .map(|trace| trace.get(NUM_COLS * (num_splits - 1), n / num_splits - 1))
+        .collect();
+    // Define proof options; these will be enough for ~96-bit security level.
+    let options = ProofOptions::new(
+        32, // number of queries
+        8,  // blowup factor
+        0,  // grinding factor
+        FieldExtension::None,
+        8,  // FRI folding factor
+        31, // FRI max remainder polynomial degree
+    );
+    // Instantiate the prover and generate the proof.
+    let prover = WorkProver::new(options);
+    let proof = prover.prove(num_splits, num_traces, traces).unwrap();
 }
 ```
 
 We can then give this proof (together with the public inputs) to anyone, and they can verify that we did in fact execute the computation and got the claimed result. They can do this like so:
 
 ```Rust
-pub fn verify_work(start: BaseElement, result: BaseElement, proof: StarkProof) {
-    // The number of steps and options are encoded in the proof itself, so we
-    // don't need to pass them explicitly to the verifier.
-    let pub_inputs = PublicInputs { start, result };
-    match winterfell::verify::<WorkAir, Blake3_256<Self::BaseField>>(proof, pub_inputs) {
-        Ok(_) => println!("yay! all good!"),
-        Err(_) => panic!("something went terribly wrong!"),
+let pub_inputs_vec = starting_vec
+        .into_iter()
+        .zip(results)
+        .map(|(start, result)| PublicInputs { start, result })
+        .collect();
+
+match verify::<WorkAir, Blake3_256<BaseElement>, DefaultRandomCoin<Blake3_256<BaseElement>>>(
+    proof,
+    pub_inputs_vec,
+    num_splits,
+) {
+    Ok(_) => {
+        println!(
+            "Proof verified in {:.1} ms",
+            now.elapsed().as_micros() as f64 / 1000f64
+        );
+    }
+    Err(err) => {
+        println!("Proof is not valid\nErr: {}", err);
     }
 }
 ```
