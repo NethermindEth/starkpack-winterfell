@@ -192,78 +192,6 @@ pub struct WorkAir {
     result: BaseElement,
 }
 
-impl Air for WorkAir {
-    // First, we'll specify which finite field to use for our computation, and also how
-    // the public inputs must look like.
-    type BaseField = BaseElement;
-    type PublicInputs = PublicInputs;
-
-    // Here, we'll construct a new instance of our computation which is defined by 3 parameters:
-    // starting value, number of steps, and the end result. Another way to think about it is
-    // that an instance of our computation is a specific invocation of the do_work() function.
-    fn new(trace_info: TraceInfo, pub_inputs: PublicInputs, options: ProofOptions) -> Self {
-        // our execution trace should have only one column.
-        assert_eq!(1, trace_info.width());
-
-        // Our computation requires a single transition constraint. The constraint itself
-        // is defined in the evaluate_transition() method below, but here we need to specify
-        // the expected degree of the constraint. If the expected and actual degrees of the
-        // constraints don't match, an error will be thrown in the debug mode, but in release
-        // mode, an invalid proof will be generated which will not be accepted by any verifier.
-        let degrees = vec![TransitionConstraintDegree::new(3)];
-
-        // We also need to specify the exact number of assertions we will place against the
-        // execution trace. This number must be the same as the number of items in a vector
-        // returned from the get_assertions() method below.
-        let num_assertions = 2;
-
-        WorkAir {
-            context: AirContext::new(trace_info, degrees, num_assertions, options),
-            start: pub_inputs.start,
-            result: pub_inputs.result,
-        }
-    }
-
-    // In this method we'll define our transition constraints; a computation is considered to
-    // be valid, if for all valid state transitions, transition constraints evaluate to all
-    // zeros, and for any invalid transition, at least one constraint evaluates to a non-zero
-    // value. The `frame` parameter will contain current and next states of the computation.
-    fn evaluate_transition<E: FieldElement + From<Self::BaseField>>(
-        &self,
-        frame: &EvaluationFrame<E>,
-        _periodic_values: &[E],
-        result: &mut [E],
-    ) {
-        // First, we'll read the current state, and use it to compute the expected next state
-        let current_state = &frame.current()[0];
-        let next_state = current_state.exp(3u32.into()) + E::from(42u32);
-
-        // Then, we'll subtract the expected next state from the actual next state; this will
-        // evaluate to zero if and only if the expected and actual states are the same.
-        result[0] = frame.next()[0] - next_state;
-    }
-
-    // Here, we'll define a set of assertions about the execution trace which must be satisfied
-    // for the computation to be valid. Essentially, this ties computation's execution trace
-    // to the public inputs.
-    fn get_assertions(&self) -> Vec<Assertion<Self::BaseField>> {
-        // for our computation to be valid, value in column 0 at step 0 must be equal to the
-        // starting value, and at the last step it must be equal to the result.
-        let last_step = self.trace_length() - 1;
-        vec![
-            Assertion::single(0, 0, self.start),
-            Assertion::single(0, last_step, self.result),
-        ]
-    }
-
-    // This is just boilerplate which is used by the Winterfell prover/verifier to retrieve
-    // the context of the computation.
-    fn context(&self) -> &AirContext<Self::BaseField> {
-        &self.context
-    }
-}
-```
-
 ```Rust
 impl Air for WorkAir {
     // First, we'll specify which finite field to use for our computations, and also how
@@ -326,7 +254,7 @@ impl Air for WorkAir {
 
         // Here we can see the difference between STARK and and Spliting STARKs.
         // In the STARKs the the transition constraint is between the State[i] and State[i+1], while
-        // in the Spliting STARKs the the transition constraint is between the State0[i] and State0[i+1], and State0[i+1] and State1[i]
+        // in the Spliting STARKs the the transition constraint is between the State0[i] and State1[i], and State0[i+1] and State1[i]
         for idx in 0..num_splits - 1 {
             result[idx] = current[NUM_COLS * idx].exp(3u32.into()) + E::from(42u32)
                 - current[NUM_COLS * (idx + 1)];
@@ -622,4 +550,5 @@ This project is [MIT licensed](./LICENSE).
 Acknowledgements
 -------
 
-The original codebase was developed by Irakliy Khaburzaniya ([@irakliyk](https://github.com/irakliyk)) with contributions from François Garillot ([@huitseeker](https://github.com/huitseeker)), Kevin Lewi ([@kevinlewi](https://github.com/kevinlewi)), Konstantinos Chalkias ([@kchalkias](https://github.com/kchalkias)), and Jasleen Malvai ([@Jasleen1](https://github.com/Jasleen1)).
+This codebase is developed by Nethermind and YSU crytography research groups.
+And is based on the winterfell library.
