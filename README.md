@@ -17,6 +17,9 @@ A STARK is a novel proof-of-computation scheme to create efficiently verifiable 
 
 The aim of this project is to build a feature-rich, easy to use, and highly performant STARK prover which can generate integrity proofs for very large computations. STARK proof generation process is massively parallelizable, however, it also requires lots of RAM. For very large computations, amount of RAM available on a single machine may not be sufficient to efficiently generate a proof. Therefore, our final goal is to efficiently distribute proof generation across many machines.
 
+This project is a fork of the original winterfell zk-STARK prover, with the aim of integrating proof aggregation as in the following paper: [On amortization techniques for FRI-based SNARKs
+](https://eprint.iacr.org/2024/661)
+
 ### Status and features
 
 Winterfell is a fully-functional, multi-threaded STARK prover and verifier with the following nice properties:
